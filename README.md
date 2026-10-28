@@ -9,12 +9,21 @@ your computer; an account and sync between devices are optional.
 
 ## See it in action
 
-Click a picture to play the video (German interface).
+The videos show the German interface.
 
-| Create a task, start the timer | Two tasks at once: the time is split |
-| :---: | :---: |
-| [![Create a task and start its timer](media/create-a-task.jpg)](media/create-a-task.mp4) | [![Start a second task alongside the first](media/track-alongside.jpg)](media/track-alongside.mp4) |
-| <kbd>Ctrl</kbd>+<kbd>N</kbd>, type a title, Enter, and one click starts the timer. | Start a second task alongside: the time is split evenly between both. |
+### Create a task, start the timer
+
+<kbd>Ctrl</kbd>+<kbd>N</kbd>, type a title, Enter, and one click starts the
+timer.
+
+https://github.com/user-attachments/assets/852c126d-a525-4335-b2c0-a609b7bcd7e9
+
+### Two tasks at once
+
+Start a second task alongside the first: the time is split evenly between
+both.
+
+https://github.com/user-attachments/assets/e57ad17a-caf7-4e5c-91f6-347ccf2a720b
 
 ## What it does
 
