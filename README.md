@@ -7,6 +7,15 @@ your computer; an account and sync between devices are optional.
 **[Web app](https://app.knorky.com)** ·
 **[knorky.com](https://knorky.com)**
 
+## See it in action
+
+Click a picture to play the video (German interface).
+
+| Create a task, start the timer | Two tasks at once: the time is split |
+| :---: | :---: |
+| [![Create a task and start its timer](media/create-a-task.jpg)](media/create-a-task.mp4) | [![Start a second task alongside the first](media/track-alongside.jpg)](media/track-alongside.mp4) |
+| <kbd>Ctrl</kbd>+<kbd>N</kbd>, type a title, Enter, and one click starts the timer. | Start a second task alongside: the time from then on is split evenly between both. |
+
 ## What it does
 
 - **Timers** — start, pause and switch tasks in one click. Run several
