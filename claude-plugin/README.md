@@ -132,15 +132,15 @@ the server reports a problem, the line shows it: `⏱ time tracking: …`.
 
 ## Commands
 
-| Command                 | What it does                                                       |
-| ----------------------- | ------------------------------------------------------------------ |
-| `/track`                | What runs, this repository's project, and how Claude starts timers |
-| `/track <task>`         | Tracks only this task: the other timers stop                       |
-| `/track add <task>`     | Tracks this task too: the time is split with the running ones      |
-| `/track stop`           | Stops this session's task                                          |
-| `/track single`         | Claude tracks one task at a time (the default)                     |
-| `/track split`          | Claude adds its tasks to the running ones                          |
-| `/track project <name>` | The project this repository's time goes to                         |
+| Command                 | What it does                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `/track`                | What runs with each task's total, this repository's project, how Claude starts timers, and a link to Knorky |
+| `/track <task>`         | Tracks only this task: the other timers stop                                                                |
+| `/track add <task>`     | Tracks this task too: the time is split with the running ones                                               |
+| `/track stop`           | Stops this session's task                                                                                   |
+| `/track single`         | Claude tracks one task at a time (the default)                                                              |
+| `/track split`          | Claude adds its tasks to the running ones                                                                   |
+| `/track project <name>` | The project this repository's time goes to                                                                  |
 
 A task named with `/track` is found in the project by its title, or created.
 You can also just ask Claude: "track this in parallel", "stop the timer".

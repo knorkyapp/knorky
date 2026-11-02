@@ -308,6 +308,23 @@ test('/track project remembers the project, and the rules tell Claude about it',
   expect(rules).toContain('list_tasks with issue "ACME-1013"')
 })
 
+test("/track shows each running task's total, not how long the timers ran", async ($, on) => {
+  // started together, both timers ran 0:27; their tasks' totals differ
+  const other: Timer = { ...SCOREBOARD, task_id: 'gone', task: 'Write the offer', project: null }
+  engine(on, [{ ...SCOREBOARD }, other], [])
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const status = await $.command.run({ command: 'track', args: '' })
+  const lines = status.text?.split('\n') ?? []
+  expect(lines.slice(0, 3)).toEqual([
+    'Running: Fix the scoreboard · Acme · Σ 3:10',
+    'Running: Write the offer',
+    'The time is split between the 2 timers.',
+  ])
+  expect(status.text).not.toContain('0:27')
+  expect(lines.at(-1)).toBe('Your time in Knorky: https://app.knorky.com')
+})
+
 test('without a project, the rules tell Claude to ask for one', async ($, on) => {
   engine(on, [], [])
   on('prompt.compose', () => ({ sections: [] }))
@@ -316,7 +333,8 @@ test('without a project, the rules tell Claude to ask for one', async ($, on) =>
   const status = await $.command.run({ command: 'track', args: '' })
   expect(status.text).toBe(
     'Nothing is running.\nThis repository has no project yet: /track project <name>\n' +
-      'Claude tracks one task at a time (single): /track split to change',
+      'Claude tracks one task at a time (single): /track split to change\n' +
+      'Your time in Knorky: https://app.knorky.com',
   )
 
   const composed = await $.prompt.compose({

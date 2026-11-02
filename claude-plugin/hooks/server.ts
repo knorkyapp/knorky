@@ -31,6 +31,21 @@ export async function call($: Api, tool: string, args?: Record<string, unknown>)
   return text ? (JSON.parse(text) as unknown) : null
 }
 
+/**
+ * Σ of a task, as the app's player shows it: everything tracked on it, in
+ * seconds; null when the server does not find it.
+ */
+export async function taskSeconds($: Api, task: { id: string; title: string }) {
+  const found = (await call($, 'list_tasks', { search: task.title, status: 'all' })) as {
+    id: string
+    tracked_minutes: number
+    tracked_seconds?: number
+  }[]
+  const hit = found.find((t) => t.id === task.id)
+  // a server from before `tracked_seconds` counts in whole minutes
+  return hit ? (hit.tracked_seconds ?? hit.tracked_minutes * 60) : null
+}
+
 export async function refresh($: Api) {
   try {
     const now = (await call($, 'get_running_timers')) as {
@@ -47,20 +62,10 @@ export async function refresh($: Api) {
     const first = now.running[0]
     const task =
       (await read($, sessionTask)) ?? (first ? { id: first.task_id, title: first.task } : null)
-    let sum: TaskTotal | null = null
-    if (task) {
-      // Σ, as the app's player shows it: everything tracked on the task
-      const found = (await call($, 'list_tasks', { search: task.title, status: 'all' })) as {
-        id: string
-        tracked_minutes: number
-        tracked_seconds?: number
-      }[]
-      const hit = found.find((t) => t.id === task.id)
-      // a server from before `tracked_seconds` counts in whole minutes
-      const seconds = hit ? (hit.tracked_seconds ?? hit.tracked_minutes * 60) : null
-      if (seconds !== null) sum = { taskId: task.id, seconds }
-    }
-    await update($, taskTotal, () => sum)
+    const seconds = task ? await taskSeconds($, task) : null
+    await update($, taskTotal, () =>
+      task && seconds !== null ? { taskId: task.id, seconds } : null,
+    )
   } catch (e) {
     await update($, error, () => String((e as Error).message ?? e))
   }

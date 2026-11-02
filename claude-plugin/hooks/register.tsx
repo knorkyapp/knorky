@@ -3,11 +3,11 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Mode, Project, Running, SessionTask } from '../types'
 import { addStep, endTurn } from './agentWork'
-import { drawBand } from './band'
+import { drawBand, hm } from './band'
 import { armIdle, setWorking, stopIdle } from './idle'
 import { branchIssue, git } from './git'
 import type { BranchIssue } from './git'
-import { call, findOrCreate, refresh, startTask, stopSessionTask } from './server'
+import { call, findOrCreate, refresh, startTask, stopSessionTask, taskSeconds } from './server'
 import { claim, initSessions } from './sessions'
 
 // Values the band draws from; the server's answers are the truth, these only
@@ -28,6 +28,8 @@ const REFRESH_MS = 60 * 1000
 // The plugin reports Claude's work itself; the model never calls this one.
 const PLUGIN_ONLY = /^mcp__.+__record_agent_work$/
 const PLUGIN_ONLY_SAYS = 'This tool is for the plugin only.'
+/** Where the person sees their time. */
+const APP_URL = 'https://app.knorky.com'
 
 type Api = EngineInterface
 type Cancel = { cancel: () => void } | null
@@ -124,9 +126,15 @@ async function track($: Api, args: string): Promise<string> {
     await refresh($)
     const now = await read($, running)
     const p = await read($, project)
-    const lines = now.length
-      ? now.map((r) => `Running: ${r.task} (${r.hm})`)
-      : ['Nothing is running.']
+    const lines: string[] = []
+    for (const r of now) {
+      // Σ, as the app shows it: timers started together all ran equally long
+      const seconds = await taskSeconds($, { id: r.task_id, title: r.task }).catch(() => null)
+      const parts = [r.task, r.project, seconds === null ? null : `Σ ${hm(seconds * 1000)}`]
+      lines.push(`Running: ${parts.filter(Boolean).join(' · ')}`)
+    }
+    if (now.length > 1) lines.push(`The time is split between the ${now.length} timers.`)
+    if (!now.length) lines.push('Nothing is running.')
     lines.push(
       p
         ? `This repository's project: ${p.name}`
@@ -137,6 +145,7 @@ async function track($: Api, args: string): Promise<string> {
         ? 'Claude adds its tasks to the running ones (split): /track single to change'
         : 'Claude tracks one task at a time (single): /track split to change',
     )
+    lines.push(`Your time in Knorky: ${APP_URL}`)
     return lines.join('\n')
   }
   if (args === 'stop') {
