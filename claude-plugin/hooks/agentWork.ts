@@ -178,17 +178,19 @@ async function closeTurn($: Api, durationMs: number) {
 }
 
 /**
- * Sends each row not yet sent, outside any hook and the store's queue: a
- * slow server holds neither the turn nor the steps after it. The rows hold
- * totals, so sends that cross or arrive late lose nothing; one that fails
- * waits for the next turn's send.
+ * Sends each row of one list not yet sent, outside the store's queue: a
+ * slow server holds no step. The rows hold totals, so sends that cross or
+ * arrive late lose nothing; one that fails, or that `open` no longer
+ * allows, waits for the next turn's send.
  */
-async function sendRows($: Api, unsentKey: string) {
+async function sendRows($: Api, unsentKey: string, open: () => boolean) {
   // the session that counted the rows, which may have ended since
   const sessionId = unsentKey.split(':')[1] ?? ''
   const toSend = ((await $.store.get(unsentKey)) as string[] | undefined) ?? []
   const sent = new Map<string, number>()
   for (const key of toSend) {
+    // past the turn's hook the call would be refused: the rest waits
+    if (!open()) break
     const row = (await $.store.get(key)) as Row | undefined
     if (!row) continue
     try {
@@ -237,8 +239,12 @@ async function prune($: Api) {
 export async function endTurn($: Api, durationMs: number) {
   await serially(() => closeTurn($, durationMs))
   const lists = (await $.store.keys()).filter((key) => UNSENT_KEY.test(key))
+  let open = true
   const sending = (async () => {
-    for (const list of lists) await sendRows($, list)
+    for (const list of lists) {
+      if (!open) break
+      await sendRows($, list, () => open)
+    }
   })().catch((err: Error) =>
     $.ui.log(`knorky: agent work not sent: ${err.message}`, { to: 'debug' }),
   )
@@ -246,5 +252,6 @@ export async function endTurn($: Api, durationMs: number) {
   const timeout = new Promise<void>((resolve) => (waited = resolve))
   const timer = $.clock.after(SEND_WAIT_MS, waited)
   await Promise.race([sending, timeout])
+  open = false
   timer.cancel()
 }

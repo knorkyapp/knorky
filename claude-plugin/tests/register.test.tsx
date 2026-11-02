@@ -44,6 +44,9 @@ type World = {
   failOnce?: Set<string>
   /** Tools whose next call the server never answers, once each. */
   hangOnce?: Set<string>
+  /** Tools whose next call the server answers once the test calls `release`. */
+  holdOnce?: Set<string>
+  release?: () => void
   /** Where the clock starts, when not at NOW. */
   now?: number
   /** The plugin's store, as earlier sessions left it. */
@@ -133,6 +136,11 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
       return { value: { content: [{ type: 'text', text: 'unreachable' }], isError: true } }
     }
     if (world.hangOnce?.delete(e.tool)) return new Promise<never>(() => undefined)
+    if (world.holdOnce?.delete(e.tool)) {
+      return new Promise((resolve) => {
+        world.release = () => resolve({ value: { content: [{ type: 'text', text: '{}' }] } })
+      })
+    }
     // the server's timers follow what the mod starts and stops
     if (e.tool === 'stop_timer') {
       const at = timers.findIndex((t) => t.task_id === e.args.task_id)
@@ -815,6 +823,39 @@ test('rows an ended session could not send go with the next turn, as its own', a
   )
   expect(sent).toContainEqual(expect.objectContaining({ session_id: 'me', task_id: 'new' }))
   expect(store.has('work:gone:unsent')).toBe(false)
+})
+
+test('past the wait, no more rows go out until the next turn', async ($, on) => {
+  const day = dayOf(NOW)
+  const store = new Map<string, unknown>([
+    [`work:gone:${day}:t1`, { day, task_id: 't1', work_ms: 1000, turns: 1, models: {} }],
+    ['work:gone:unsent', [`work:gone:${day}:t1`]],
+  ])
+  const calls: Call[] = []
+  const world: World = {
+    steps: [usage(1, 1), usage(1, 1)],
+    store,
+    holdOnce: new Set(['record_agent_work']),
+  }
+  const clock = engine(on, [], calls, world)
+
+  await tracking($)
+  await $.turn.start({ text: 'work', turnId: 'turn-1' })
+  await step($, 'turn-1', 0)
+  const ended = $.turn.complete({ ...ANSWERED, durationMs: 1000 })
+  await within(ended)
+  await clock.advance(3000)
+  expect(await within(ended)).not.toBe('blocked')
+  // the slow answer comes after the hook: the other list waits
+  world.release?.()
+  await clock.settle()
+  expect(reports(calls).length).toBe(1)
+
+  await turn($, 'turn-2', 1, 1000)
+  await clock.settle()
+  const sessions = reports(calls).map((c) => c.args.session_id)
+  expect(sessions).toContain('gone')
+  expect(sessions).toContain('me')
 })
 
 test('a server that never answers holds the turn briefly, never the next step', async ($, on) => {
