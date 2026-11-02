@@ -1,0 +1,12 @@
+{
+  "name": "knorky",
+  "owner": { "name": "Knorky" },
+  "description": "The Knorky time tracker's plugin for Claude Code",
+  "plugins": [
+    {
+      "name": "knorky",
+      "source": "./claude-plugin",
+      "description": "Tracks your Claude Code work in Knorky: a timer above the prompt, /track, and timers Claude starts for the work it does"
+    }
+  ]
+}

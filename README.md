@@ -61,6 +61,20 @@ The app updates itself after that; a running timer is never interrupted.
 There is no macOS, Linux or phone app yet. On a phone, the
 [web app](https://app.knorky.com) has a layout of its own.
 
+## Claude Code plugin
+
+With the plugin, Claude Code tracks your work by itself: it starts the
+timer for the task it works on, shows it above the prompt, and stops it
+when you stop. Type this at the prompt of Claude Code:
+
+```
+/plugin install knorky --marketplace knorkyapp/knorky
+```
+
+It needs a Knorky account with the Cloud plan. How to sign in, the
+commands, and what to do when something is wrong:
+[claude-plugin/README.md](claude-plugin/README.md).
+
 ## Your data
 
 Without an account, the desktop app works fully offline and contacts no
@@ -75,6 +89,7 @@ in this repository. You can also send feedback from inside the app.
 ## Source code
 
 Knorky is open source under the
-[AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The source code is
-not public yet, but it is **available on request**: open an issue here and
-ask, and you will be invited to the source repository.
+[AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The Claude Code
+plugin's source is in [claude-plugin/](claude-plugin/). The app's source
+code is not public yet, but it is **available on request**: open an issue
+here and ask, and you will be invited to the source repository.
