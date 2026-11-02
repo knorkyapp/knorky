@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { Mode, Project, Running, SessionTask } from '../types'
+import type { Project, Running, SessionTask } from '../types'
 import { addStep, endTurn } from './agentWork'
 import { drawBand, hm } from './band'
 import { armIdle, setWorking, stopIdle } from './idle'
@@ -12,7 +12,6 @@ import { claim, initSessions } from './sessions'
 
 // Values the band draws from; the server's answers are the truth, these only
 // mirror them for the session. Each file names the ones it reads or writes.
-const mode = atom({ plugin: 'knorky', key: 'mode' } as const, 'single' as Mode)
 const nowMs = atom({ plugin: 'knorky', key: 'nowMs' } as const, 0)
 const project = atom({ plugin: 'knorky', key: 'project' } as const, null as Project | null)
 const running = atom({ plugin: 'knorky', key: 'running' } as const, [] as Running[])
@@ -95,7 +94,6 @@ async function rules($: Api, name: string) {
   const p = await read($, project)
   const task = await read($, sessionTask)
   const now = await read($, running)
-  const split = (await read($, mode)) === 'split'
   const link = issue?.github
     ? `, linked to the issue (link: source "github", external_id "${issue.github}")`
     : issue
@@ -106,9 +104,7 @@ async function rules($: Api, name: string) {
     `The user tracks working time with the MCP server "${name}". Track this session's work there, without being asked:`,
     '- When the user starts a piece of work (a change, a fix, an investigation — not a quick question) and this session tracks no task that fits it: find the task and start its timer.',
     `  Find it: ${issue ? `list_tasks with issue "${issue.key}" (the branch names it); else ` : ''}list_tasks with a search for the topic in the project below. None fits: create_task with a short title of what the work achieves${link}.`,
-    split
-      ? '  Then start_timer with keep_others_running: true (the user splits time: this task joins the running ones), and tell the user in one line: "Tracking, split: <task>". Do not ask first.'
-      : '  Then start_timer with keep_others_running: false (the user tracks one task at a time), and tell the user in one line: "Tracking: <task>" (and what it stopped, if anything). Do not ask first.',
+    '  Then start_timer with keep_others_running: false (the user tracks one task at a time), and tell the user in one line: "Tracking: <task>" (and what it stopped, if anything). Do not ask first.',
     '  When the user asks to track a task "too", "in parallel" or "split", use keep_others_running: true for that one; "only this", "instead": false.',
     '- When the work moves to something clearly different, start the timer of that task the same way. When the user says the work is done, stop_timer with a one-line note of what was done.',
     p
@@ -140,24 +136,15 @@ async function track($: Api, args: string): Promise<string> {
         ? `This repository's project: ${p.name}`
         : 'This repository has no project yet: /track project <name>',
     )
-    lines.push(
-      (await read($, mode)) === 'split'
-        ? 'Claude adds its tasks to the running ones (split): /track single to change'
-        : 'Claude tracks one task at a time (single): /track split to change',
-    )
     lines.push(`Your time in Knorky: ${APP_URL}`)
     return lines.join('\n')
   }
   if (args === 'stop') {
     return (await stopSessionTask($, false)) ?? 'This session tracks nothing that runs.'
   }
-  const newMode = /^(single|split)$/i.exec(args)?.[1]?.toLowerCase()
-  if (newMode === 'single' || newMode === 'split') {
-    await $.store.set('mode', newMode)
-    await update($, mode, () => newMode)
-    return newMode === 'split'
-      ? 'Claude now adds its tasks to the running ones; the time is split between them.'
-      : 'Claude now tracks one task at a time; starting one stops the others.'
+  // the words of the setting before 0.3.6, which is gone: say what to do
+  if (/^(single|split)$/i.test(args)) {
+    return '/track <task> tracks only that task; /track add <task> adds it to the running ones.'
   }
   const wanted = /^project\s+(.+)$/i.exec(args)?.[1]
   if (wanted) {
@@ -194,14 +181,12 @@ export const register: Register = (on) => {
     issue = branchIssue(branch, remote)
     const saved = (await $.store.get(`project:${repoKey}`)) as Project | undefined
     await update($, project, () => saved ?? null)
-    const savedMode = await $.store.get('mode')
-    await update($, mode, () => (savedMode === 'split' ? 'split' : 'single'))
     await initSessions($)
 
     await $.command.register({
       name: 'track',
       description:
-        'Time tracking: /track (status), /track <task> (only this one), /track add <task> (split with the running ones), /track stop, /track split | single (how Claude starts timers), /track project <name>',
+        'Time tracking: /track (status), /track <task> (only this one), /track add <task> (split with the running ones), /track stop, /track project <name>',
     })
     await $.tool.register({
       name: 'remember_project',

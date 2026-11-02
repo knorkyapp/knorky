@@ -18,9 +18,6 @@ export type SessionTask = { id: string; title: string }
 /** Everything tracked on a task, to the second. */
 export type TaskTotal = { taskId: string; seconds: number }
 
-/** How Claude starts a timer by itself: alone, or split with the running ones. */
-export type Mode = 'single' | 'split'
-
 declare module 'claude-code' {
   interface PluginState {
     knorky: {
@@ -32,7 +29,6 @@ declare module 'claude-code' {
       project: Project | null
       sessionTask: SessionTask | null
       error: string | null
-      mode: Mode
       nowMs: number
       /** When `running` was last read from the server. */
       refreshedAt: number

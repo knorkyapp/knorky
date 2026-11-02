@@ -333,7 +333,6 @@ test('without a project, the rules tell Claude to ask for one', async ($, on) =>
   const status = await $.command.run({ command: 'track', args: '' })
   expect(status.text).toBe(
     'Nothing is running.\nThis repository has no project yet: /track project <name>\n' +
-      'Claude tracks one task at a time (single): /track split to change\n' +
       'Your time in Knorky: https://app.knorky.com',
   )
 
@@ -376,24 +375,23 @@ test('/track <task> tracks only that task; /track add <task> splits the time', a
   expect(starts).toEqual([false, true])
 })
 
-test('/track split makes Claude split the time, and is remembered', async ($, on) => {
-  engine(on, [], [])
+test('Claude starts its tasks alone; adding one is an action, not a setting', async ($, on) => {
+  const calls: Call[] = []
+  // a session before 0.3.6 may have stored "split"
+  engine(on, [], calls, { store: new Map<string, unknown>([['mode', 'split']]) })
   on('prompt.compose', () => ({ sections: [] }))
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-  const before = await $.prompt.compose(COMPOSE)
-  expect(before.sections.find((s) => s.id === 'knorky:rules')?.text).toContain(
-    'keep_others_running: false (the user tracks one task at a time)',
-  )
+  const rules = (await $.prompt.compose(COMPOSE)).sections.find((s) => s.id === 'knorky:rules')
+  expect(rules?.text).toContain('keep_others_running: false (the user tracks one task at a time)')
+  expect(rules?.text).toContain('"too", "in parallel" or "split", use keep_others_running: true')
 
-  const set = await $.command.run({ command: 'track', args: 'split' })
-  expect(set.text).toBe(
-    'Claude now adds its tasks to the running ones; the time is split between them.',
+  // the old words create no task called "split"; they say what to do
+  const said = await $.command.run({ command: 'track', args: 'split' })
+  expect(said.text).toBe(
+    '/track <task> tracks only that task; /track add <task> adds it to the running ones.',
   )
-  const after = await $.prompt.compose(COMPOSE)
-  expect(after.sections.find((s) => s.id === 'knorky:rules')?.text).toContain(
-    'keep_others_running: true (the user splits time',
-  )
+  expect(calls.some((c) => c.tool === 'create_task' || c.tool === 'start_timer')).toBe(false)
 })
 
 test('a task /track creates gets its timer started', async ($, on) => {
@@ -405,20 +403,6 @@ test('a task /track creates gets its timer started', async ($, on) => {
   await $.command.run({ command: 'track', args: 'Fix login' })
 
   expect(calls.find((c) => c.tool === 'start_timer')?.args.task_id).toBe('new')
-})
-
-test('/track single goes back to one task at a time', async ($, on) => {
-  engine(on, [], [])
-  on('prompt.compose', () => ({ sections: [] }))
-
-  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'track', args: 'split' })
-  const set = await $.command.run({ command: 'track', args: 'single' })
-  expect(set.text).toBe('Claude now tracks one task at a time; starting one stops the others.')
-  const rules = await $.prompt.compose(COMPOSE)
-  expect(rules.sections.find((s) => s.id === 'knorky:rules')?.text).toContain(
-    'keep_others_running: false (the user tracks one task at a time)',
-  )
 })
 
 test('without the server, /track says how to connect it', async ($, on) => {

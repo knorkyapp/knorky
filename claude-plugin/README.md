@@ -99,8 +99,9 @@ stays on for claude.ai and your phone.
    Tracking: Fix the login redirect (stopped: Write the offer)
    ```
 
-   In single mode (the default) starting a task stops the other timers;
-   the line names what it stopped.
+   Starting a task stops the other timers; the line names what it
+   stopped. To run a task next to them, say so ("track this in
+   parallel") or use `/track add`.
 
 4. **Work.** When the work moves to something clearly different, Claude
    starts that task's timer the same way. When you say the work is done,
@@ -132,23 +133,21 @@ the server reports a problem, the line shows it: `⏱ time tracking: …`.
 
 ## Commands
 
-| Command                 | What it does                                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `/track`                | What runs with each task's total, this repository's project, how Claude starts timers, and a link to Knorky |
-| `/track <task>`         | Tracks only this task: the other timers stop                                                                |
-| `/track add <task>`     | Tracks this task too: the time is split with the running ones                                               |
-| `/track stop`           | Stops this session's task                                                                                   |
-| `/track single`         | Claude tracks one task at a time (the default)                                                              |
-| `/track split`          | Claude adds its tasks to the running ones                                                                   |
-| `/track project <name>` | The project this repository's time goes to                                                                  |
+| Command                 | What it does                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------- |
+| `/track`                | What runs with each task's total, this repository's project, and a link to Knorky |
+| `/track <task>`         | Tracks only this task: the other timers stop                                      |
+| `/track add <task>`     | Tracks this task too: the time is split with the running ones                     |
+| `/track stop`           | Stops this session's task                                                         |
+| `/track project <name>` | The project this repository's time goes to                                        |
 
 A task named with `/track` is found in the project by its title, or created.
 You can also just ask Claude: "track this in parallel", "stop the timer".
 
-**Single or split?** Single suits one thing at a time. Split suits several
-Claude Code windows on different tasks at once: each window's task joins the
-running timers, and Knorky shares the time between them, so the hours add up
-to the real time worked.
+**One task, or several at once?** `/track <task>` suits one thing at a
+time. `/track add <task>` suits several Claude Code windows on different
+tasks at once: each window's task joins the running timers, and Knorky
+shares the time between them, so the hours add up to the real time worked.
 
 ## Claude's own work
 
@@ -208,8 +207,7 @@ for this repository.
 ## What it stores
 
 On your computer, in Claude Code's plugin storage: the project chosen for
-each repository (keyed by the repository's `origin` address) and the single
-or split choice; and each session's agent work per day and task (time,
+each repository (keyed by the repository's `origin` address); and each session's agent work per day and task (time,
 turns, token counts and the models' names, never what was said), kept for
 a week so a report that could not be sent goes later. In `~/.claude/plugin-sessions/knorky/`, one
 small file per session naming the task it tracks, so two windows on one
