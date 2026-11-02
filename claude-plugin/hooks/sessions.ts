@@ -3,9 +3,9 @@ import type { EngineInterface } from 'claude-code'
 type Api = EngineInterface
 
 // Each Claude Code session writes which task it tracks to a file of its own,
-// and rewrites it every minute. A session that ends, or goes idle, stops its
-// task only when no other session's file names that task: two windows on the
-// same task share one timer.
+// and rewrites it every minute. A session that ends stops its task only when
+// no other session's file names that task: two windows on the same task share
+// one timer.
 const FRESH_MS = 3 * 60 * 1000
 
 let folder = ''

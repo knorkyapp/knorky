@@ -4,7 +4,6 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Project, Running, SessionTask } from '../types'
 import { addStep, endTurn } from './agentWork'
 import { drawBand, hm, pressBand } from './band'
-import { armIdle, setWorking, settleAway, stopIdle } from './idle'
 import { branchIssue, git } from './git'
 import type { BranchIssue } from './git'
 import { call, findOrCreate, refresh, startTask, stopSessionTask, taskSeconds } from './server'
@@ -168,9 +167,7 @@ async function track($: Api, args: string): Promise<string> {
   const p = await read($, project)
   if (!p) return 'Choose the project first: /track project <name>'
   const task = await findOrCreate($, p, added ?? args)
-  const said = await startTask($, task, added !== undefined)
-  armIdle($)
-  return said
+  return startTask($, task, added !== undefined)
 }
 
 export const register: Register = (on) => {
@@ -210,11 +207,9 @@ export const register: Register = (on) => {
   })
 
   on('session.end', async ($, e, next) => {
-    stopIdle()
     tick?.cancel()
     seconds?.cancel()
     try {
-      await settleAway($)
       await stopSessionTask($, true)
     } catch {
       // the server cannot be reached: the timer keeps running, any app can stop it
@@ -223,22 +218,8 @@ export const register: Register = (on) => {
     return next(e)
   })
 
-  // While Claude works the person is not away: the idle clock waits for the
-  // turn's end, however long the turn takes.
-  on('turn.start', async ($, e, next) => {
-    if (e.agentId !== undefined) return next(e)
-    setWorking($, true)
-    // the person is back: a timer the idle clock ran out on stops now
-    await settleAway($).then(
-      (said) => said && $.ui.toast(`${said} – no activity for 20 minutes`),
-      (err: Error) => $.ui.log(`knorky: idle stop failed: ${err.message}`, { to: 'debug' }),
-    )
-    return next(e)
-  })
-
   on('turn.complete', async ($, e, next) => {
     if (e.agentId !== undefined) return next(e)
-    setWorking($, false)
     const done = await next(e)
     try {
       await endTurn($, e.durationMs)
@@ -253,7 +234,6 @@ export const register: Register = (on) => {
   // The band's buttons act here, in a hook: from the button's own handler
   // Claude Code refuses the plugin's calls.
   on('ui.press', { plugin: 'knorky' }, async ($, e) => {
-    await settleAway($).catch(() => null)
     const said = await pressBand($, e.element).catch((err: Error) => err.message)
     if (said) $.ui.toast(said)
     return { element: e.element }
@@ -338,7 +318,6 @@ export const register: Register = (on) => {
           text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky:knorky and sign in.',
         }
       }
-      await settleAway($)
       return { text: await track($, e.args.trim()) }
     } catch (err) {
       return { text: `Time tracking: ${(err as Error).message}` }

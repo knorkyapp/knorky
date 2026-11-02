@@ -18,7 +18,6 @@ const BAND = {
 
 type Call = { tool: string; args: Record<string, unknown> }
 type Timer = {
-  entry_id?: string
   task_id: string
   task: string
   project: string | null
@@ -152,7 +151,6 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
     if (e.tool === 'start_timer') {
       const known = { t1: 'Fix the scoreboard' } as Record<string, string>
       timers.push({
-        entry_id: `e-${String(e.args.task_id)}`,
         task_id: String(e.args.task_id),
         task: known[String(e.args.task_id)] ?? 'task',
         project: 'Acme',
@@ -478,49 +476,21 @@ const ANSWERED = {
   reason: 'answer' as const,
 }
 
-test('the idle clock waits while Claude works, however long the turn', async ($, on) => {
+test('no prompt for hours stops no timer: testing in a browser is work too', async ($, on) => {
   const calls: Call[] = []
   const clock = engine(on, [], calls)
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'track', args: 'project acme' })
   await $.command.run({ command: 'track', args: 'Fix login' })
+  // three hours without a prompt, in steps: the band's clock ticks every second
+  for (let i = 0; i < 6; i++) await clock.advance(30 * 60 * 1000)
   await $.prompt.submit({ text: TURN.text })
   await $.turn.start(TURN)
-  await clock.advance(25 * 60 * 1000)
-  expect(calls.some((c) => c.tool === 'stop_timer')).toBe(false)
-
   await $.turn.complete(ANSWERED)
-  const leftAt = clock.now()
-  // from a timer Claude Code refuses the plugin's calls: the stop waits
-  await clock.advance(21 * 60 * 1000)
+
   expect(calls.some((c) => c.tool === 'stop_timer')).toBe(false)
-
-  // back: the timer stops, and ends when the person left
-  await $.prompt.submit({ text: 'more' })
-  await $.turn.start({ ...TURN, turnId: 'turn-2' })
-  expect(calls.find((c) => c.tool === 'stop_timer')?.args.task_id).toBe('new')
-  expect(calls.find((c) => c.tool === 'update_time_entry')?.args).toMatchObject({
-    entry_id: 'e-new',
-    end: new Date(leftAt).toISOString(),
-  })
-})
-
-test('a session that ends while away ends its timer when the person left', async ($, on) => {
-  const calls: Call[] = []
-  const clock = engine(on, [], calls)
-
-  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-  await $.command.run({ command: 'track', args: 'project acme' })
-  await $.command.run({ command: 'track', args: 'Fix login' })
-  const leftAt = clock.now()
-  await clock.advance(45 * 60 * 1000)
-  await $.session.end({ reason: 'other', sessionId: 'me' })
-
-  expect(calls.filter((c) => c.tool === 'stop_timer').length).toBe(1)
-  expect(calls.find((c) => c.tool === 'update_time_entry')?.args.end).toBe(
-    new Date(leftAt).toISOString(),
-  )
+  expect(calls.some((c) => c.tool === 'update_time_entry')).toBe(false)
 })
 
 test('the band reads the server at the end of a turn, not from a timer', async ($, on) => {

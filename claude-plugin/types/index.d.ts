@@ -1,5 +1,4 @@
 export type Running = {
-  entry_id?: string
   task_id: string
   task: string
   project: string | null

@@ -118,16 +118,6 @@ export async function stopSessionTask($: Api, unlessShared: boolean) {
   return `Stopped: ${task.title}`
 }
 
-/** Moves the end of a stopped entry back to `ms`. */
-export async function endEntryAt($: Api, entryId: string, ms: number) {
-  await call($, 'update_time_entry', {
-    entry_id: entryId,
-    end: new Date(ms).toISOString(),
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-  })
-  await refresh($)
-}
-
 /** Pauses the task: its timer stops, and it stays the session's task. */
 export async function pause($: Api, task: SessionTask) {
   await update($, sessionTask, () => task)

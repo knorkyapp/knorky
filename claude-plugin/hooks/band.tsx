@@ -2,7 +2,6 @@ import { atom, read } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
 import type { Project, Running, SessionTask, TaskTotal } from '../types'
-import { armIdle } from './idle'
 import { endBreak, pause, startTask } from './server'
 
 // Values the band draws from; the server's answers are the truth, these only
@@ -115,9 +114,7 @@ export async function pressBand($: Api, element: string): Promise<string | null>
   if (!task) return null
   if (element === 'pause') return pause($, task)
   if (element !== 'start' && element !== 'add') return null
-  const said = await startTask($, task, element === 'add')
-  armIdle($)
-  return said
+  return startTask($, task, element === 'add')
 }
 
 /**
