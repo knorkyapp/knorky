@@ -3,8 +3,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { Project, Running, SessionTask } from '../types'
 import { addStep, endTurn } from './agentWork'
-import { drawBand, hm } from './band'
-import { armIdle, setWorking, stopIdle } from './idle'
+import { drawBand, hm, pressBand } from './band'
+import { armIdle, setWorking, settleAway, stopIdle } from './idle'
 import { branchIssue, git } from './git'
 import type { BranchIssue } from './git'
 import { call, findOrCreate, refresh, startTask, stopSessionTask, taskSeconds } from './server'
@@ -47,13 +47,17 @@ async function countSecond($: Api) {
 }
 
 /**
- * Every minute: what runs, and this session's claim on its task. Until the
- * server is found, looks for it again: it can connect after the session
- * started, or come back after a reconnect.
+ * Every minute: this session's claim on its task, and the server, looked for
+ * again until found: it can connect after the session started, or come back
+ * after a reconnect. No call to the server: from a timer, Claude Code refuses
+ * the plugin's calls. What runs is read in the hooks (turns, presses, /track).
  */
 async function everyMinute($: Api) {
-  if (!(await ensureServer($))) return
-  await refresh($)
+  if (!(await read($, server))) {
+    const found = await findServer($)
+    if (!found) return
+    await update($, server, () => found)
+  }
   const task = await read($, sessionTask)
   const isRunning = task && (await read($, running)).some((r) => r.task_id === task.id)
   await claim($, isRunning ? task.id : null)
@@ -210,6 +214,7 @@ export const register: Register = (on) => {
     tick?.cancel()
     seconds?.cancel()
     try {
+      await settleAway($)
       await stopSessionTask($, true)
     } catch {
       // the server cannot be reached: the timer keeps running, any app can stop it
@@ -221,7 +226,13 @@ export const register: Register = (on) => {
   // While Claude works the person is not away: the idle clock waits for the
   // turn's end, however long the turn takes.
   on('turn.start', async ($, e, next) => {
-    if (e.agentId === undefined) setWorking($, true)
+    if (e.agentId !== undefined) return next(e)
+    setWorking($, true)
+    // the person is back: a timer the idle clock ran out on stops now
+    await settleAway($).then(
+      (said) => said && $.ui.toast(`${said} – no activity for 20 minutes`),
+      (err: Error) => $.ui.log(`knorky: idle stop failed: ${err.message}`, { to: 'debug' }),
+    )
     return next(e)
   })
 
@@ -234,7 +245,18 @@ export const register: Register = (on) => {
     } catch (err) {
       $.ui.log(`knorky: agent work not counted: ${(err as Error).message}`, { to: 'debug' })
     }
+    // what runs and the totals, read here: a hook's call goes through
+    if (await read($, server)) await refresh($)
     return done
+  })
+
+  // The band's buttons act here, in a hook: from the button's own handler
+  // Claude Code refuses the plugin's calls.
+  on('ui.press', { plugin: 'knorky' }, async ($, e) => {
+    await settleAway($).catch(() => null)
+    const said = await pressBand($, e.element).catch((err: Error) => err.message)
+    if (said) $.ui.toast(said)
+    return { element: e.element }
   })
 
   // What each model request cost, sub-agents' too: Claude's work, never the
@@ -316,6 +338,7 @@ export const register: Register = (on) => {
           text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky:knorky and sign in.',
         }
       }
+      await settleAway($)
       return { text: await track($, e.args.trim()) }
     } catch (err) {
       return { text: `Time tracking: ${(err as Error).message}` }

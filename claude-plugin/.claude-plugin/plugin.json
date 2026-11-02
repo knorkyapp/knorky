@@ -1,6 +1,6 @@
 {
   "name": "knorky",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "description": "Tracks your Claude Code work in Knorky: a timer above the prompt with play and pause, /track, and timers Claude starts for the work it does, per repository",
   "author": {
     "name": "Knorky"

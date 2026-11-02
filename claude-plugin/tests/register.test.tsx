@@ -18,9 +18,10 @@ const BAND = {
 
 type Call = { tool: string; args: Record<string, unknown> }
 type Timer = {
+  entry_id?: string
   task_id: string
   task: string
-  project: string
+  project: string | null
   hm: string
   seconds?: number
   started_at: string
@@ -138,7 +139,8 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
     if (world.hangOnce?.delete(e.tool)) return new Promise<never>(() => undefined)
     if (world.holdOnce?.delete(e.tool)) {
       return new Promise((resolve) => {
-        world.release = () => resolve({ value: { content: [{ type: 'text', text: '{}' }] } })
+        world.release = () =>
+          resolve({ value: { content: [{ type: 'text', text: '{}' }], isError: false } })
       })
     }
     // the server's timers follow what the mod starts and stops
@@ -150,6 +152,7 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
     if (e.tool === 'start_timer') {
       const known = { t1: 'Fix the scoreboard' } as Record<string, string>
       timers.push({
+        entry_id: `e-${String(e.args.task_id)}`,
         task_id: String(e.args.task_id),
         task: known[String(e.args.task_id)] ?? 'task',
         project: 'Acme',
@@ -426,8 +429,10 @@ test('a server that connects after the session started still gets the band', asy
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   expect(await ui.find({ type: 'Text', text: /Fix the scoreboard/ })).toBeUndefined()
 
+  // found on the minute; what runs is read at the next turn's end, in a hook
   world.tools = TOOLS
   await clock.advance(60 * 1000)
+  await $.turn.complete(ANSWERED)
   expect(await drawn(ui, 'pause')).toBe(true)
   await ui.unmount()
 })
@@ -486,8 +491,51 @@ test('the idle clock waits while Claude works, however long the turn', async ($,
   expect(calls.some((c) => c.tool === 'stop_timer')).toBe(false)
 
   await $.turn.complete(ANSWERED)
+  const leftAt = clock.now()
+  // from a timer Claude Code refuses the plugin's calls: the stop waits
   await clock.advance(21 * 60 * 1000)
-  expect(calls.some((c) => c.tool === 'stop_timer')).toBe(true)
+  expect(calls.some((c) => c.tool === 'stop_timer')).toBe(false)
+
+  // back: the timer stops, and ends when the person left
+  await $.prompt.submit({ text: 'more' })
+  await $.turn.start({ ...TURN, turnId: 'turn-2' })
+  expect(calls.find((c) => c.tool === 'stop_timer')?.args.task_id).toBe('new')
+  expect(calls.find((c) => c.tool === 'update_time_entry')?.args).toMatchObject({
+    entry_id: 'e-new',
+    end: new Date(leftAt).toISOString(),
+  })
+})
+
+test('a session that ends while away ends its timer when the person left', async ($, on) => {
+  const calls: Call[] = []
+  const clock = engine(on, [], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'Fix login' })
+  const leftAt = clock.now()
+  await clock.advance(45 * 60 * 1000)
+  await $.session.end({ reason: 'other', sessionId: 'me' })
+
+  expect(calls.filter((c) => c.tool === 'stop_timer').length).toBe(1)
+  expect(calls.find((c) => c.tool === 'update_time_entry')?.args.end).toBe(
+    new Date(leftAt).toISOString(),
+  )
+})
+
+test('the band reads the server at the end of a turn, not from a timer', async ($, on) => {
+  const calls: Call[] = []
+  const clock = engine(on, [{ ...SCOREBOARD }], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const reads = () => calls.filter((c) => c.tool === 'get_running_timers').length
+  const atStart = reads()
+  await clock.advance(5 * 60 * 1000)
+  expect(reads()).toBe(atStart)
+
+  await $.turn.start(TURN)
+  await $.turn.complete(ANSWERED)
+  expect(reads()).toBe(atStart + 1)
 })
 
 test('a session that ends leaves a timer another session tracks', async ($, on) => {

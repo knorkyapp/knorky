@@ -42,19 +42,13 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
     const hm = await read($, breakHm)
     return (
       <Box>
-        <Button
-          key="endBreak"
-          label="▶"
-          onPress={() => void endBreak($).then((t) => $.ui.toast(t))}
-        />
+        <Button key="endBreak" label="▶" onPress={pressed} />
         <Text dimColor> on a break{hm ? ` · ${hm}` : ''}</Text>
       </Box>
     )
   }
 
-  const first = now[0]
-  const task =
-    (await read($, sessionTask)) ?? (first ? { id: first.task_id, title: first.task } : null)
+  const task = await shownTask($)
   if (!task) {
     return (
       <Box>
@@ -76,25 +70,11 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   return (
     <Box>
       {entry ? (
-        <Button
-          key="pause"
-          label="⏸"
-          onPress={() => void pause($, task).then((t) => $.ui.toast(t))}
-        />
+        <Button key="pause" label="⏸" onPress={pressed} />
       ) : (
-        <Button
-          key="start"
-          label="▶"
-          onPress={() => void startTask($, task, false).then((t) => (armIdle($), $.ui.toast(t)))}
-        />
+        <Button key="start" label="▶" onPress={pressed} />
       )}
-      {!entry && others > 0 ? (
-        <Button
-          key="add"
-          label="+"
-          onPress={() => void startTask($, task, true).then((t) => (armIdle($), $.ui.toast(t)))}
-        />
-      ) : null}
+      {!entry && others > 0 ? <Button key="add" label="+" onPress={pressed} /> : null}
       <Text bold={entry !== undefined} dimColor={entry === undefined}>
         {' '}
         {task.title.slice(0, 50)}
@@ -116,6 +96,28 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
       ) : null}
     </Box>
   )
+}
+
+/** The task the band shows: this session's, else the first that runs. */
+async function shownTask($: Api) {
+  const first = (await read($, running))[0]
+  return (await read($, sessionTask)) ?? (first ? { id: first.task_id, title: first.task } : null)
+}
+
+// A press acts in the plugin's `ui.press` hook (pressBand): from here,
+// outside any hook, Claude Code would refuse the plugin's calls.
+const pressed = () => undefined
+
+/** What a press of the band's button `element` does; what to say, or null. */
+export async function pressBand($: Api, element: string): Promise<string | null> {
+  if (element === 'endBreak') return endBreak($)
+  const task = await shownTask($)
+  if (!task) return null
+  if (element === 'pause') return pause($, task)
+  if (element !== 'start' && element !== 'add') return null
+  const said = await startTask($, task, element === 'add')
+  armIdle($)
+  return said
 }
 
 /**

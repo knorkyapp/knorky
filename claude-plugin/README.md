@@ -14,8 +14,10 @@ you work with Claude on your Knorky account.
 - **One project per repository.** Claude asks once which project a
   repository's work goes to, and remembers it.
 - **Timers stop with you.** When the session ends, or after 20 minutes with
-  no prompt once Claude has finished, the session's timer stops. A long
-  piece of work by Claude is not "no activity". When another Claude Code
+  no prompt once Claude has finished, the session's timer ends. After 20
+  minutes away it stops when you are back (your next prompt, a press, or
+  the session's end), and its time ends when you left. A long piece of work
+  by Claude is not "no activity". When another Claude Code
   window tracks the same task, its timer keeps running.
 - **Breaks only when you use them.** Claude starts a break ("I'm off to
   lunch") only while breaks are switched on in the app (Settings → Tracking,
@@ -107,7 +109,7 @@ stays on for claude.ai and your phone.
    starts that task's timer the same way. When you say the work is done,
    Claude stops the timer with a one-line note.
 5. **Leave.** When you close the session, or after 20 minutes without a
-   prompt, the timer stops by itself. Its note lists the commits you made.
+   prompt, the timer ends by itself, at the moment you left. Its note lists the commits you made.
 
 Not happy with a task Claude chose? Name the right one: `/track <task>`.
 
@@ -189,7 +191,9 @@ include the API.
 server are both on. Turn off `claude.ai Knorky` in `/mcp`.
 
 **The timer stopped by itself.** After 20 minutes without a prompt, the
-plugin stops it and says "– no activity for 20 minutes". Time Claude spends
+plugin says "No activity for 20 minutes". When you are back it stops the
+timer, ends its time when you left, and says "– no activity for 20
+minutes". Time Claude spends
 working does not count as no activity. Start it again with ▶ or
 `/track <task>`.
 
