@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { Project, Running, SessionTask, TaskTotal } from '../types'
+import type { DayTotal, Project, Running, SessionTask } from '../types'
+import { localDay } from './agentWork'
 import { commitNote } from './git'
 import { claim, sharedWithOthers } from './sessions'
 
@@ -17,7 +18,7 @@ const sessionTask = atom(
   { plugin: 'knorky', key: 'sessionTask' } as const,
   null as SessionTask | null,
 )
-const taskTotal = atom({ plugin: 'knorky', key: 'taskTotal' } as const, null as TaskTotal | null)
+const dayTotal = atom({ plugin: 'knorky', key: 'dayTotal' } as const, null as DayTotal | null)
 
 type Api = EngineInterface
 
@@ -46,6 +47,23 @@ export async function taskSeconds($: Api, task: { id: string; title: string }) {
   return hit ? (hit.tracked_seconds ?? hit.tracked_minutes * 60) : null
 }
 
+/**
+ * Everything tracked on `day` (this computer's), on all tasks, running
+ * timers included: what the app's today total shows. Null without a time
+ * zone to ask in.
+ */
+export async function daySeconds($: Api, day: string) {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  if (!timezone) return null
+  const totals = (await call($, 'get_time_totals', {
+    from_date: day,
+    to_date: day,
+    timezone,
+    group_by: 'day',
+  })) as { total_minutes: number }
+  return totals.total_minutes * 60
+}
+
 export async function refresh($: Api) {
   try {
     const now = (await call($, 'get_running_timers')) as {
@@ -58,14 +76,9 @@ export async function refresh($: Api) {
     await update($, onBreak, () => now.break !== null)
     await update($, breakHm, () => now.break?.hm ?? null)
     await update($, error, () => null)
-    // the task the band shows: this session's, else the first that runs
-    const first = now.running[0]
-    const task =
-      (await read($, sessionTask)) ?? (first ? { id: first.task_id, title: first.task } : null)
-    const seconds = task ? await taskSeconds($, task) : null
-    await update($, taskTotal, () =>
-      task && seconds !== null ? { taskId: task.id, seconds } : null,
-    )
+    const day = localDay(at)
+    const seconds = await daySeconds($, day)
+    await update($, dayTotal, () => (seconds === null ? null : { day, seconds }))
   } catch (e) {
     await update($, error, () => String((e as Error).message ?? e))
   }

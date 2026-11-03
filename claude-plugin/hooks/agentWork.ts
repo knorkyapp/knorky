@@ -72,7 +72,7 @@ function serially<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /** The user's local date of a time, as YYYY-MM-DD. */
-function localDay(ms: number) {
+export function localDay(ms: number) {
   const d = new Date(ms)
   const two = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`

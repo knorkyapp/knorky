@@ -4,7 +4,7 @@ A plugin for [Claude Code](https://claude.com/claude-code) that tracks the time
 you work with Claude on your Knorky account.
 
 - **A timer above the prompt**, like the app's player: ▶ and ⏸, the task and
-  its project, and Σ, the time tracked on the task in all, in hours and
+  its project, and the time you worked today on all tasks, in hours and
   minutes as the app shows it. A **+** adds a paused task back next
   to the timers that run, so the time is split. On a break, ▶ ends it.
 - **Claude tracks by itself.** When you start a piece of work, Claude finds
@@ -118,19 +118,19 @@ Not happy with a task Claude chose? Name the right one: `/track <task>`.
 ## The timer above the prompt
 
 ```
-[⏸ +1] Fix the login redirect · Website Σ 2:40
+[⏸ +1] Fix the login redirect · Website · today 2:40
 ```
 
-| Part                     | What it means                                                                                                   |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| ⏸                        | Pauses the task: its timer stops, the task stays here                                                           |
-| ⏸ +1                     | The same, while one more timer runs: the time is split between them                                             |
-| ▶                        | Starts the task again, alone                                                                                    |
-| +                        | Starts the task again next to the running timers: the time is split                                             |
-| `Fix the login redirect` | This session's task                                                                                             |
-| `Website`                | Its project                                                                                                     |
-| `Σ 2:40`                 | Everything tracked on the task, as in the app; it counts on while the timer runs, by its share when several run |
-| `+1 running`             | This task is paused; one other timer runs                                                                       |
+| Part                     | What it means                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- |
+| ⏸                        | Pauses the task: its timer stops, the task stays here                                                       |
+| ⏸ +1                     | The same, while one more timer runs: the time is split between them                                         |
+| ▶                        | Starts the task again, alone                                                                                |
+| +                        | Starts the task again next to the running timers: the time is split                                         |
+| `Fix the login redirect` | This session's task                                                                                         |
+| `Website`                | Its project                                                                                                 |
+| `today 2:40`             | The time you worked today, on all tasks, as the app's today total shows it; it counts on while a timer runs |
+| `+1 running`             | This task is paused; one other timer runs                                                                   |
 
 On a break the line reads `▶ on a break · 0:15`, and ▶ ends the break. When
 the server reports a problem, the line shows it: `⏱ time tracking: …`.

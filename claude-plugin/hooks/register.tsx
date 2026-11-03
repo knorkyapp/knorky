@@ -6,7 +6,16 @@ import { addStep, endTurn } from './agentWork'
 import { drawBand, hm, pressBand } from './band'
 import { branchIssue, git } from './git'
 import type { BranchIssue } from './git'
-import { call, findOrCreate, refresh, startTask, stopSessionTask, taskSeconds } from './server'
+import { localDay } from './agentWork'
+import {
+  call,
+  daySeconds,
+  findOrCreate,
+  refresh,
+  startTask,
+  stopSessionTask,
+  taskSeconds,
+} from './server'
 import { claim, initSessions } from './sessions'
 
 // Values the band draws from; the server's answers are the truth, these only
@@ -138,13 +147,15 @@ async function track($: Api, args: string): Promise<string> {
     const p = await read($, project)
     const lines: string[] = []
     for (const r of now) {
-      // Σ, as the app shows it: timers started together all ran equally long
+      // the task's total, as the app shows it: timers started together all ran equally long
       const seconds = await taskSeconds($, { id: r.task_id, title: r.task }).catch(() => null)
-      const parts = [r.task, r.project, seconds === null ? null : `Σ ${hm(seconds * 1000)}`]
+      const parts = [r.task, r.project, seconds === null ? null : `${hm(seconds * 1000)} in all`]
       lines.push(`Running: ${parts.filter(Boolean).join(' · ')}`)
     }
     if (now.length > 1) lines.push(`The time is split between the ${now.length} timers.`)
     if (!now.length) lines.push('Nothing is running.')
+    const today = await daySeconds($, localDay(await $.clock.now())).catch(() => null)
+    if (today !== null) lines.push(`Today: ${hm(today * 1000)} on all tasks`)
     lines.push(
       p
         ? `This repository's project: ${p.name}`

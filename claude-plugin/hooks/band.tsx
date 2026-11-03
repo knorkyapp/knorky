@@ -1,7 +1,8 @@
 import { atom, read } from 'claude-code'
 import type { EngineInterface, RenderInput } from 'claude-code'
 
-import type { Project, Running, SessionTask, TaskTotal } from '../types'
+import type { DayTotal, Project, Running, SessionTask } from '../types'
+import { localDay } from './agentWork'
 import { endBreak, pause, startTask } from './server'
 
 // Values the band draws from; the server's answers are the truth, these only
@@ -17,13 +18,13 @@ const sessionTask = atom(
   { plugin: 'knorky', key: 'sessionTask' } as const,
   null as SessionTask | null,
 )
-const taskTotal = atom({ plugin: 'knorky', key: 'taskTotal' } as const, null as TaskTotal | null)
+const dayTotal = atom({ plugin: 'knorky', key: 'dayTotal' } as const, null as DayTotal | null)
 
 type Api = EngineInterface
 
 /**
- * The app's player, in a line: ▶/⏸, the task and its project, and Σ, the
- * time tracked on it in all, in hours and minutes as the app shows it. Pause
+ * The app's player, in a line: ▶/⏸, the task and its project, and the time
+ * worked today on all tasks, in hours and minutes as the app shows it. Pause
  * keeps the task shown, so the same button resumes it. While the task runs
  * next to others, ⏸ carries their count: the time is split with them.
  */
@@ -60,10 +61,12 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   const others = now.filter((r) => r.task_id !== task.id).length
   // until the second tick has run, the last check is the latest time known
   const askedAt = await read($, refreshedAt)
-  const sum = await read($, taskTotal)
+  const clock = (await read($, nowMs)) || askedAt
+  const today = await read($, dayTotal)
+  // past midnight the day's total is yesterday's until the server is asked again
   const ms =
-    sum?.taskId === task.id
-      ? totalMs(sum.seconds, entry, (await read($, nowMs)) || askedAt, askedAt, now.length)
+    today && today.day === localDay(clock)
+      ? todayMs(today.seconds, now.length > 0, clock, askedAt)
       : null
   const projectName = entry?.project ?? (await read($, project))?.name ?? null
 
@@ -80,13 +83,13 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
         {task.title.slice(0, 50)}
       </Text>
       {projectName ? <Text dimColor> · {projectName}</Text> : null}
+      {ms === null ? null : <Text dimColor> · today </Text>}
       {ms === null ? null : entry ? (
         <Text color="success" bold>
-          {' '}
-          Σ {hm(ms)}
+          {hm(ms)}
         </Text>
       ) : (
-        <Text dimColor> Σ {hm(ms)}</Text>
+        <Text dimColor>{hm(ms)}</Text>
       )}
       {!entry && others > 0 ? <Text dimColor> · +{others} running</Text> : null}
     </Box>
@@ -114,18 +117,13 @@ export async function pressBand($: Api, element: string): Promise<string | null>
 }
 
 /**
- * Everything tracked on the task, as the app counts it: the server's total
- * when last asked, plus this timer's share of the time since while it runs.
+ * Today's time, as the app counts it: the server's total when last asked,
+ * plus the time since while any timer runs. Timers that run together share
+ * the time, so together they add it once, not once each.
  */
-export function totalMs(
-  seconds: number,
-  entry: Running | undefined,
-  now: number,
-  askedAt: number,
-  runningCount: number,
-): number {
-  const since = entry && askedAt > 0 ? Math.max(0, now - askedAt) : 0
-  return seconds * 1000 + since / Math.max(1, runningCount)
+export function todayMs(seconds: number, anyRuns: boolean, now: number, askedAt: number): number {
+  const since = anyRuns && askedAt > 0 ? Math.max(0, now - askedAt) : 0
+  return seconds * 1000 + since
 }
 
 /** h:mm, as the app shows a total. */

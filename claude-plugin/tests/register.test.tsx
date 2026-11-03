@@ -53,6 +53,8 @@ type World = {
   store?: Map<string, unknown>
   /** Seconds tracked on "Fix the scoreboard" in all, when not 3:10. */
   scoreboardSeconds?: number
+  /** Minutes tracked today on all tasks, when not 2:15. */
+  todayMinutes?: number
 }
 
 type StepUsage = {
@@ -188,7 +190,9 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
               : []
             : e.tool === 'create_task'
               ? { task: { id: 'new', title: e.args.title, project: 'Acme' } }
-              : { stopped: [] }
+              : e.tool === 'get_time_totals'
+                ? { total_minutes: world.todayMinutes ?? 135, total_hm: 'unused', groups: [] }
+                : { stopped: [] }
     return { value: { content: [{ type: 'text', text: JSON.stringify(answer) }], isError: false } }
   })
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -273,17 +277,26 @@ test('pause keeps the task in the band, and play resumes it alone', async ($, on
   await ui.unmount()
 })
 
-test('the band shows Σ, the time tracked on the session task in all', async ($, on) => {
-  engine(on, [], [])
+test("the band shows today's time on all tasks, not the task's total", async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls)
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'track', args: 'project acme' })
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
   await $.command.run({ command: 'track', args: 'add Fix the scoreboard' })
 
-  expect((await ui.find({ type: 'Text', text: /Σ/ }))?.text).toContain('Σ 1:05')
+  expect(await ui.find({ type: 'Text', text: /today/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '2:15' })).toBeDefined()
+  // the task's total in all (1:05) is not shown
+  expect(await ui.find({ type: 'Text', text: /1:05/ })).toBeUndefined()
   // hours and minutes, as the app shows the total: no clock with seconds
   expect(await ui.find({ type: 'Text', text: /\d:\d\d:\d\d/ })).toBeUndefined()
+  // asked for this computer's day, in its time zone
+  const asked = calls.find((c) => c.tool === 'get_time_totals')?.args
+  expect(asked?.from_date).toBe(asked?.to_date)
+  expect(asked?.from_date).toMatch(/^2026-10-(29|30|31)$/)
+  expect(asked?.timezone).toBe(Intl.DateTimeFormat().resolvedOptions().timeZone)
   await ui.unmount()
 })
 
@@ -317,10 +330,11 @@ test("/track shows each running task's total, not how long the timers ran", asyn
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const status = await $.command.run({ command: 'track', args: '' })
   const lines = status.text?.split('\n') ?? []
-  expect(lines.slice(0, 3)).toEqual([
-    'Running: Fix the scoreboard · Acme · Σ 3:10',
+  expect(lines.slice(0, 4)).toEqual([
+    'Running: Fix the scoreboard · Acme · 3:10 in all',
     'Running: Write the offer',
     'The time is split between the 2 timers.',
+    'Today: 2:15 on all tasks',
   ])
   expect(status.text).not.toContain('0:27')
   expect(lines.at(-1)).toBe('Your time in Knorky: https://app.knorky.com')
@@ -333,7 +347,8 @@ test('without a project, the rules tell Claude to ask for one', async ($, on) =>
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const status = await $.command.run({ command: 'track', args: '' })
   expect(status.text).toBe(
-    'Nothing is running.\nThis repository has no project yet: /track project <name>\n' +
+    'Nothing is running.\nToday: 2:15 on all tasks\n' +
+      'This repository has no project yet: /track project <name>\n' +
       'Claude adds its task to the running timers (split): /track default only to change\n' +
       'Your time in Knorky: https://app.knorky.com',
   )
@@ -512,13 +527,16 @@ test("Claude's calls to the server are left to auto mode", async ($, on) => {
   expect(claudes.decision).toBe('deny')
 })
 
-test("a timer started in the app shows its task's total, as the app does", async ($, on) => {
+test("a timer started in the app shows, with today's time", async ($, on) => {
   // the session tracks nothing: the band shows the timer that runs
   engine(on, [{ ...SCOREBOARD }], [])
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /Σ/ }))?.text).toContain('Σ 3:10')
+  expect((await ui.find({ type: 'Text', text: /Fix the scoreboard/ }))?.text).toContain(
+    'Fix the scoreboard',
+  )
+  expect(await ui.find({ type: 'Text', text: '2:15' })).toBeDefined()
   await ui.unmount()
 })
 
@@ -619,7 +637,7 @@ test('on a break, the band shows it and ▶ ends it', async ($, on) => {
   await ui.unmount()
 })
 
-test("with timers split, the total counts on by this one's share", async ($, on) => {
+test("with timers split, today's time counts on once, not by each one's share", async ($, on) => {
   const split = (id: string, task: string): Timer => ({
     task_id: id,
     task,
@@ -629,21 +647,17 @@ test("with timers split, the total counts on by this one's share", async ($, on)
     started_at: '2026-10-30T11:00:00Z',
     started_by: 'app',
   })
-  // 3:10:50 tracked on the task when the server was asked
   const clock = engine(on, [split('t1', 'Fix the scoreboard'), split('t2', 'Docs')], [], {
-    scoreboardSeconds: 190 * 60 + 50,
+    todayMinutes: 190,
   })
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-  expect((await ui.find({ type: 'Text', text: /Σ/ }))?.text).toContain('Σ 3:10')
-  await clock.advance(24_000)
+  expect(await ui.find({ type: 'Text', text: '3:10' })).toBeDefined()
+  await clock.advance(61_000)
 
-  // half of the 24 s since: 3:11:02, not the whole 24 s on top
-  expect((await ui.find({ type: 'Text', text: /Σ/ }))?.text).toContain('Σ 3:11')
-  // the other timer's count is in the pause button, not in the line
-  expect((await ui.find({ type: 'Button', key: 'pause' }))?.text).toBe('⏸ +1')
-  expect(await ui.find({ type: 'Text', text: /split/ })).toBeUndefined()
+  // the whole 61 s since: 3:11:01; by one timer's share it would still read 3:10
+  expect(await ui.find({ type: 'Text', text: '3:11' })).toBeDefined()
   await ui.unmount()
 })
 

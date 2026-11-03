@@ -14,8 +14,8 @@ export type Project = { id: string; name: string }
 /** The task this session tracks: one Claude or /track started here. */
 export type SessionTask = { id: string; title: string }
 
-/** Everything tracked on a task, to the second. */
-export type TaskTotal = { taskId: string; seconds: number }
+/** Everything tracked today, on all tasks, as the server counted it. */
+export type DayTotal = { day: string; seconds: number }
 
 declare module 'claude-code' {
   interface PluginState {
@@ -31,8 +31,8 @@ declare module 'claude-code' {
       nowMs: number
       /** When `running` was last read from the server. */
       refreshedAt: number
-      /** Σ of the task the band shows, when `refreshedAt` was read. */
-      taskTotal: TaskTotal | null
+      /** Today's time, when `refreshedAt` was read. */
+      dayTotal: DayTotal | null
     }
   }
 }
