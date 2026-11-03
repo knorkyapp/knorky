@@ -268,7 +268,7 @@ test('pause keeps the task in the band, and play resumes it alone', async ($, on
   await ui.press({ key: 'start' })
   expect(await drawn(ui, 'pause')).toBe(true)
   const start = calls.find((c) => c.tool === 'start_timer')
-  expect(start?.args).toEqual({ task_id: 't1', keep_others_running: false })
+  expect(start?.args).toEqual({ task_id: 't1', mode: 'only', keep_others_running: false })
   expect(await ui.find({ type: 'Button', key: 'pause' })).toBeDefined()
   await ui.unmount()
 })
@@ -334,6 +334,7 @@ test('without a project, the rules tell Claude to ask for one', async ($, on) =>
   const status = await $.command.run({ command: 'track', args: '' })
   expect(status.text).toBe(
     'Nothing is running.\nThis repository has no project yet: /track project <name>\n' +
+      'Claude adds its task to the running timers (split): /track default only to change\n' +
       'Your time in Knorky: https://app.knorky.com',
   )
 
@@ -372,26 +373,80 @@ test('/track <task> tracks only that task; /track add <task> splits the time', a
 
   const starts = calls
     .filter((c) => c.tool === 'start_timer')
-    .map((c) => c.args.keep_others_running)
-  expect(starts).toEqual([false, true])
+    .map((c) => [c.args.mode, c.args.keep_others_running])
+  expect(starts).toEqual([
+    ['only', false],
+    ['split', true],
+  ])
 })
 
-test('Claude starts its tasks alone; adding one is an action, not a setting', async ($, on) => {
+const rulesText = async ($: Parameters<Parameters<typeof test>[1]>[0]) =>
+  (await $.prompt.compose(COMPOSE)).sections.find((s) => s.id === 'knorky:rules')?.text ?? ''
+
+test('Claude splits the time by default; the setting before 0.3.6 changes nothing', async ($, on) => {
   const calls: Call[] = []
-  // a session before 0.3.6 may have stored "split"
-  engine(on, [], calls, { store: new Map<string, unknown>([['mode', 'split']]) })
+  // a session before 0.3.6 may have stored "single"
+  engine(on, [], calls, { store: new Map<string, unknown>([['mode', 'single']]) })
   on('prompt.compose', () => ({ sections: [] }))
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
-  const rules = (await $.prompt.compose(COMPOSE)).sections.find((s) => s.id === 'knorky:rules')
-  expect(rules?.text).toContain('keep_others_running: false (the user tracks one task at a time)')
-  expect(rules?.text).toContain('"too", "in parallel" or "split", use keep_others_running: true')
+  const rules = await rulesText($)
+  expect(rules).toContain(`start_timer with mode "split" (the user's default`)
+  expect(rules).not.toContain(`mode "only" (the user's default`)
+  expect(rules).toContain('"too", "also", "add", "in parallel" and "split" mean mode "split"')
+  expect(rules).toContain('"instead", "only this" and "stop the others" mean mode "only"')
+  expect(rules).toContain('unclear whether the other timers should stop, ask the user first')
 
-  // the old words create no task called "split"; they say what to do
+  // the old words create no task called "split"; they say what to use now
   const said = await $.command.run({ command: 'track', args: 'split' })
   expect(said.text).toBe(
-    '/track <task> tracks only that task; /track add <task> adds it to the running ones.',
+    '/track default split | only sets how Claude starts timers; /track <task> tracks only that task; /track add <task> adds it to the running ones.',
   )
+  expect(calls.some((c) => c.tool === 'create_task' || c.tool === 'start_timer')).toBe(false)
+})
+
+test('/track default only makes Claude stop the other timers, and is remembered', async ($, on) => {
+  const store = new Map<string, unknown>()
+  engine(on, [], [], { store })
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const set = await $.command.run({ command: 'track', args: 'default only' })
+  expect(set.text).toBe('Claude now tracks only its task; starting one stops the other timers.')
+  expect(store.get('default-mode')).toBe('only')
+  expect(await rulesText($)).toContain(`start_timer with mode "only" (the user's default`)
+  const status = await $.command.run({ command: 'track', args: '' })
+  expect(status.text).toContain(
+    'Claude tracks only its task (the other timers stop): /track default split to change',
+  )
+
+  const back = await $.command.run({ command: 'track', args: 'default split' })
+  expect(back.text).toBe(
+    'Claude now adds its task to the running timers; the time is split between them.',
+  )
+  expect(await rulesText($)).toContain(`start_timer with mode "split" (the user's default`)
+})
+
+test('a later session starts with the default an earlier one chose', async ($, on) => {
+  engine(on, [], [], { store: new Map<string, unknown>([['default-mode', 'only']]) })
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  expect(await rulesText($)).toContain(`start_timer with mode "only" (the user's default`)
+})
+
+test('/track default without split or only says the words and keeps the default', async ($, on) => {
+  const calls: Call[] = []
+  const store = new Map<string, unknown>()
+  engine(on, [], calls, { store })
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  for (const args of ['default', 'default parallel']) {
+    const said = await $.command.run({ command: 'track', args })
+    expect(said.text).toBe('/track default split | only')
+  }
+  expect(store.has('default-mode')).toBe(false)
   expect(calls.some((c) => c.tool === 'create_task' || c.tool === 'start_timer')).toBe(false)
 })
 

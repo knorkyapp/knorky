@@ -26,6 +26,9 @@ const REFRESH_MS = 60 * 1000
 // The plugin reports Claude's work itself; the model never calls this one.
 const PLUGIN_ONLY = /^mcp__.+__record_agent_work$/
 const PLUGIN_ONLY_SAYS = 'This tool is for the plugin only.'
+// The user's default for the timers Claude starts. A new key: what the
+// setting removed in 0.3.6 stored under "mode" does not come back by itself.
+const DEFAULT_MODE = 'default-mode'
 /** Where the person sees their time. */
 const APP_URL = 'https://app.knorky.com'
 
@@ -92,11 +95,17 @@ async function rememberProject($: Api, p: Project) {
   await update($, project, () => p)
 }
 
+/** How Claude starts the timers it picks itself: the user's choice, split unless set. */
+async function defaultMode($: Api): Promise<'split' | 'only'> {
+  return (await $.store.get(DEFAULT_MODE)) === 'only' ? 'only' : 'split'
+}
+
 /** The rules Claude follows, with what it needs to know about this session. */
 async function rules($: Api, name: string) {
   const p = await read($, project)
   const task = await read($, sessionTask)
   const now = await read($, running)
+  const only = (await defaultMode($)) === 'only'
   const link = issue?.github
     ? `, linked to the issue (link: source "github", external_id "${issue.github}")`
     : issue
@@ -107,8 +116,10 @@ async function rules($: Api, name: string) {
     `The user tracks working time with the MCP server "${name}". Track this session's work there, without being asked:`,
     '- When the user starts a piece of work (a change, a fix, an investigation — not a quick question) and this session tracks no task that fits it: find the task and start its timer.',
     `  Find it: ${issue ? `list_tasks with issue "${issue.key}" (the branch names it); else ` : ''}list_tasks with a search for the topic in the project below. None fits: create_task with a short title of what the work achieves${link}.`,
-    '  Then start_timer with keep_others_running: false (the user tracks one task at a time), and tell the user in one line: "Tracking: <task>" (and what it stopped, if anything). Do not ask first.',
-    '  When the user asks to track a task "too", "in parallel" or "split", use keep_others_running: true for that one; "only this", "instead": false.',
+    only
+      ? '  Then start_timer with mode "only" (the user\'s default: the other timers stop), and tell the user in one line: "Tracking: <task>" (and what it stopped, if anything). Do not ask first.'
+      : '  Then start_timer with mode "split" (the user\'s default: the task joins the running timers and the time is shared between them), and tell the user in one line: "Tracking, split: <task>". Do not ask first.',
+    '  When the user names a task: "too", "also", "add", "in parallel" and "split" mean mode "split"; "instead", "only this" and "stop the others" mean mode "only". Without such a word, use the default above. If the user\'s words leave it unclear whether the other timers should stop, ask the user first.',
     '- When the work moves to something clearly different, start the timer of that task the same way. When the user says the work is done, stop_timer with a one-line note of what was done.',
     p
       ? `- This repository's project: ${p.name} (project_id ${p.id}).`
@@ -139,15 +150,29 @@ async function track($: Api, args: string): Promise<string> {
         ? `This repository's project: ${p.name}`
         : 'This repository has no project yet: /track project <name>',
     )
+    lines.push(
+      (await defaultMode($)) === 'only'
+        ? 'Claude tracks only its task (the other timers stop): /track default split to change'
+        : 'Claude adds its task to the running timers (split): /track default only to change',
+    )
     lines.push(`Your time in Knorky: ${APP_URL}`)
     return lines.join('\n')
   }
   if (args === 'stop') {
     return (await stopSessionTask($, false)) ?? 'This session tracks nothing that runs.'
   }
-  // the words of the setting before 0.3.6, which is gone: say what to do
+  const chosen = /^default(?:\s+(\S+))?$/i.exec(args)
+  if (chosen) {
+    const value = chosen[1]?.toLowerCase()
+    if (value !== 'split' && value !== 'only') return '/track default split | only'
+    await $.store.set(DEFAULT_MODE, value)
+    return value === 'only'
+      ? 'Claude now tracks only its task; starting one stops the other timers.'
+      : 'Claude now adds its task to the running timers; the time is split between them.'
+  }
+  // the words of the setting before 0.3.6: say what to use now
   if (/^(single|split)$/i.test(args)) {
-    return '/track <task> tracks only that task; /track add <task> adds it to the running ones.'
+    return '/track default split | only sets how Claude starts timers; /track <task> tracks only that task; /track add <task> adds it to the running ones.'
   }
   const wanted = /^project\s+(.+)$/i.exec(args)?.[1]
   if (wanted) {
@@ -187,7 +212,7 @@ export const register: Register = (on) => {
     await $.command.register({
       name: 'track',
       description:
-        'Time tracking: /track (status), /track <task> (only this one), /track add <task> (split with the running ones), /track stop, /track project <name>',
+        'Time tracking: /track (status), /track <task> (only this one), /track add <task> (split with the running ones), /track stop, /track default split | only (how Claude starts timers), /track project <name>',
     })
     await $.tool.register({
       name: 'remember_project',

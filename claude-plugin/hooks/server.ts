@@ -78,6 +78,8 @@ export async function refresh($: Api) {
 export async function startTask($: Api, task: SessionTask, split: boolean) {
   const result = (await call($, 'start_timer', {
     task_id: task.id,
+    mode: split ? 'split' : 'only',
+    // what a server from before `mode` reads
     keep_others_running: split,
   })) as { stopped?: { task: string }[] }
   await update($, sessionTask, () => task)

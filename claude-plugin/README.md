@@ -96,12 +96,15 @@ stays on for claude.ai and your phone.
    you in one line:
 
    ```
-   Tracking: Fix the login redirect (stopped: Write the offer)
+   Tracking, split: Fix the login redirect
    ```
 
-   Starting a task stops the other timers; the line names what it
-   stopped. To run a task next to them, say so ("track this in
-   parallel") or use `/track add`.
+   By default the task joins the timers already running, and the time
+   is split between them: two tasks that run for an hour get 30 minutes
+   each. To stop the others, say so ("instead", "only this") or use
+   `/track <task>`. When your words leave it unclear, Claude asks before
+   stopping them. `/track default only` makes stopping the others the
+   default; the line then names what it stopped.
 
 4. **Work.** When the work moves to something clearly different, Claude
    starts that task's timer the same way. When you say the work is done,
@@ -140,10 +143,13 @@ the server reports a problem, the line shows it: `⏱ time tracking: …`.
 | `/track <task>`         | Tracks only this task: the other timers stop                                      |
 | `/track add <task>`     | Tracks this task too: the time is split with the running ones                     |
 | `/track stop`           | Stops this session's task                                                         |
+| `/track default split`  | Claude adds its tasks to the running timers (the default)                         |
+| `/track default only`   | Claude tracks only its task: the other timers stop                                |
 | `/track project <name>` | The project this repository's time goes to                                        |
 
 A task named with `/track` is found in the project by its title, or created.
-You can also just ask Claude: "track this in parallel", "stop the timer".
+You can also just ask Claude: "add the docs task", "track this in parallel",
+"track only this", "stop the timer".
 
 **One task, or several at once?** `/track <task>` suits one thing at a
 time. `/track add <task>` suits several Claude Code windows on different
