@@ -24,7 +24,8 @@ type Api = EngineInterface
 /**
  * The app's player, in a line: ▶/⏸, the task and its project, and Σ, the
  * time tracked on it in all, in hours and minutes as the app shows it. Pause
- * keeps the task shown, so the same button resumes it.
+ * keeps the task shown, so the same button resumes it. While the task runs
+ * next to others, ⏸ carries their count: the time is split with them.
  */
 export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   const { Box, Button, Text } = $.ui.resolve(e)
@@ -69,7 +70,7 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   return (
     <Box>
       {entry ? (
-        <Button key="pause" label="⏸" onPress={pressed} />
+        <Button key="pause" label={others > 0 ? `⏸ +${others}` : '⏸'} onPress={pressed} />
       ) : (
         <Button key="start" label="▶" onPress={pressed} />
       )}
@@ -87,12 +88,7 @@ export async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
       ) : (
         <Text dimColor> Σ {hm(ms)}</Text>
       )}
-      {others > 0 ? (
-        <Text dimColor>
-          {' '}
-          · +{others} {entry ? 'split' : 'running'}
-        </Text>
-      ) : null}
+      {!entry && others > 0 ? <Text dimColor> · +{others} running</Text> : null}
     </Box>
   )
 }

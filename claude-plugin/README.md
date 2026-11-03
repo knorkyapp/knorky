@@ -118,18 +118,18 @@ Not happy with a task Claude chose? Name the right one: `/track <task>`.
 ## The timer above the prompt
 
 ```
-⏸ Fix the login redirect · Website Σ 2:40 · +1 split
+[⏸ +1] Fix the login redirect · Website Σ 2:40
 ```
 
 | Part                     | What it means                                                                                                   |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | ⏸                        | Pauses the task: its timer stops, the task stays here                                                           |
+| ⏸ +1                     | The same, while one more timer runs: the time is split between them                                             |
 | ▶                        | Starts the task again, alone                                                                                    |
 | +                        | Starts the task again next to the running timers: the time is split                                             |
 | `Fix the login redirect` | This session's task                                                                                             |
 | `Website`                | Its project                                                                                                     |
 | `Σ 2:40`                 | Everything tracked on the task, as in the app; it counts on while the timer runs, by its share when several run |
-| `+1 split`               | One more timer runs; the time is split between them                                                             |
 | `+1 running`             | This task is paused; one other timer runs                                                                       |
 
 On a break the line reads `▶ on a break · 0:15`, and ▶ ends the break. When

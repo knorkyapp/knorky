@@ -244,7 +244,7 @@ test('the band shows the running task as the player does: pause, name, project',
     'Fix the scoreboard',
   )
   expect((await ui.find({ type: 'Text', text: /Acme/ }))?.text).toContain('Acme')
-  expect(await ui.find({ type: 'Button', key: 'pause' })).toBeDefined()
+  expect((await ui.find({ type: 'Button', key: 'pause' }))?.text).toBe('⏸')
   expect(await ui.find({ type: 'Button', key: 'start' })).toBeUndefined()
   expect(calls.map((c) => c.tool)).toContain('get_running_timers')
   await ui.unmount()
@@ -641,6 +641,9 @@ test("with timers split, the total counts on by this one's share", async ($, on)
 
   // half of the 24 s since: 3:11:02, not the whole 24 s on top
   expect((await ui.find({ type: 'Text', text: /Σ/ }))?.text).toContain('Σ 3:11')
+  // the other timer's count is in the pause button, not in the line
+  expect((await ui.find({ type: 'Button', key: 'pause' }))?.text).toBe('⏸ +1')
+  expect(await ui.find({ type: 'Text', text: /split/ })).toBeUndefined()
   await ui.unmount()
 })
 
