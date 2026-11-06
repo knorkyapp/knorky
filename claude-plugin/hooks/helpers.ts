@@ -4,10 +4,15 @@
 
 import type { Project, Running, SessionTask } from '../types/index.d.ts'
 
-// A tracker's issue key in a branch name: feat/ENG-123-fix
-const ISSUE_KEY = /\b([A-Za-z][A-Za-z0-9]+-\d+)\b/
+// A tracker's issue key in a branch name, in capitals anywhere: fix-ENG-123
+const ISSUE_KEY_CAPITALS = /(?<![A-Za-z0-9])([A-Z][A-Z0-9]+-\d+)(?![A-Za-z0-9.])/
+// In small letters only where a part of the name opens: dan/eng-123-fix. Further
+// on it is a word with a number: update-node-20.
+const ISSUE_KEY_SMALL = /(?:^|\/)([a-z][a-z0-9]+-\d+)(?=[-_/]|$)/
+// What reads like a key, and is how a branch names a GitHub issue.
+const GITHUB_WORD = /^(?:gh|issues?)-/i
 // A GitHub issue number opening a part of a branch name: feat/102-fix, gh-102
-const ISSUE_NUMBER = /(?:^|\/)(?:gh-|issue-|issues-)?(\d{1,7})(?=[-_]|$)/
+const ISSUE_NUMBER = /(?:^|\/)(?:gh-|issue-|issues-)?(\d{1,7})(?=[-_]|$)/i
 const GITHUB_REPO = /github\.com[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/
 // stop_timer takes a note of at most this many characters
 const NOTE_MAX = 2000
@@ -52,6 +57,11 @@ export const NO_TOKENS: Tokens = {
   models: {},
 }
 
+/** A git command's result, or a failed one when it could not start or took too long. */
+export function unlessFailed<T extends { exitCode: number; stdout: string }>(ran: Promise<T>) {
+  return ran.catch(() => ({ exitCode: 1, stdout: '' }))
+}
+
 /** What a git command printed; nothing when it failed. */
 export function gitOutput(ran: { exitCode: number; stdout: string }) {
   return ran.exitCode === 0 ? ran.stdout.trim() : ''
@@ -59,8 +69,8 @@ export function gitOutput(ran: { exitCode: number; stdout: string }) {
 
 /** The issue the branch is for: a tracker's key, else a GitHub issue number. */
 export function branchIssue(branch: string, remote: string): BranchIssue | null {
-  const key = ISSUE_KEY.exec(branch)?.[1]
-  if (key) return { key: key.toUpperCase(), github: null }
+  const key = ISSUE_KEY_CAPITALS.exec(branch)?.[1] ?? ISSUE_KEY_SMALL.exec(branch)?.[1]
+  if (key && !GITHUB_WORD.test(key)) return { key: key.toUpperCase(), github: null }
   const repo = GITHUB_REPO.exec(remote)?.[1]
   const number = ISSUE_NUMBER.exec(branch)?.[1]
   if (!repo || !number) return null

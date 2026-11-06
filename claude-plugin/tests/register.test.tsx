@@ -1,5 +1,7 @@
 import { expect, mock, test } from 'claude-code/testing'
 
+import { branchIssue } from '../hooks/helpers.ts'
+
 const SERVER = 'claude_ai_Time'
 const TOOLS = ['start_timer', 'stop_timer', 'get_running_timers', 'create_task', 'list_tasks']
 
@@ -37,6 +39,10 @@ type World = {
   log?: string
   /** Fills with the commands the plugin runs. */
   commands?: string[][]
+  /** The commands cannot start: no git on this machine. */
+  noGit?: boolean
+  /** The account's projects, when not Acme and Garden. */
+  projects?: { id: string; name: string }[]
   /** Files by path: the other sessions' claims. */
   files?: Map<string, { text: string; mtimeMs: number }>
   onBreak?: boolean
@@ -88,6 +94,7 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
   }))
   on('process.run', (_, e) => {
     world.commands?.push([...e.argv])
+    if (world.noGit) throw new Error('git: not found')
     return {
       value: {
         exitCode: 0,
@@ -170,10 +177,10 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
       e.tool === 'get_running_timers'
         ? { break: world.onBreak ? { hm: '0:12' } : null, running: timers }
         : e.tool === 'list_projects'
-          ? [
+          ? (world.projects ?? [
               { id: 'p1', name: 'Acme' },
               { id: 'p2', name: 'Garden' },
-            ]
+            ])
           : e.tool === 'list_tasks'
             ? e.args.status === 'all'
               ? [
@@ -722,6 +729,230 @@ test('a timer with no commits since it started gets no note', async ($, on) => {
   await $.session.end({ reason: 'other', sessionId: 'me' })
 
   expect(calls.find((c) => c.tool === 'stop_timer')?.args).toEqual({ task_id: 'new' })
+})
+
+test('a session that ends stops every timer it started, none from the app', async ($, on) => {
+  const calls: Call[] = []
+  const timers: Timer[] = [
+    { ...SCOREBOARD, task_id: 'a', task: 'First' },
+    { ...SCOREBOARD, task_id: 'b', task: 'Second' },
+    { ...SCOREBOARD, task_id: 'app', task: 'Started in the app' },
+  ]
+  engine(on, timers, calls)
+  on('tool.call', () => ({ result: 'started' }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const tool = `mcp__${SERVER}__start_timer`
+  await $.tool.call({ tool, task_id: 'a', mode: 'split' } as never)
+  await $.tool.call({ tool, task_id: 'b', mode: 'split' } as never)
+  await $.session.end({ reason: 'other', sessionId: 'me' })
+
+  const stopped = calls.filter((c) => c.tool === 'stop_timer').map((c) => c.args.task_id)
+  expect(stopped.sort()).toEqual(['a', 'b'])
+})
+
+test('a session names all its timers, and leaves the one another window tracks', async ($, on) => {
+  const calls: Call[] = []
+  const timers: Timer[] = [
+    { ...SCOREBOARD, task_id: 'a', task: 'First' },
+    { ...SCOREBOARD, task_id: 'b', task: 'Second' },
+  ]
+  const files = new Map([[`${CLAIMS}/other.json`, { text: '{"task_ids":["a"]}', mtimeMs: NOW }]])
+  engine(on, timers, calls, { files })
+  on('tool.call', () => ({ result: 'started' }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const tool = `mcp__${SERVER}__start_timer`
+  await $.tool.call({ tool, task_id: 'a', mode: 'split' } as never)
+  await $.tool.call({ tool, task_id: 'b', mode: 'split' } as never)
+  const mine = JSON.parse(files.get(`${CLAIMS}/me.json`)?.text ?? '{}')
+  expect(mine.task_ids.sort()).toEqual(['a', 'b'])
+  // a window on an older version reads this one
+  expect(mine.task_id).toBe('b')
+
+  await $.session.end({ reason: 'other', sessionId: 'me' })
+  expect(calls.filter((c) => c.tool === 'stop_timer').map((c) => c.args.task_id)).toEqual(['b'])
+})
+
+test('/track add and /track project alone say the words, and start nothing', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [{ ...SCOREBOARD }], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const add = await $.command.run({ command: 'track', args: 'add' })
+  expect(add.text).toBe('/track add <task>')
+  const project = await $.command.run({ command: 'track', args: 'project' })
+  expect(project.text).toBe('/track project <name>')
+  expect(calls.some((c) => c.tool === 'create_task' || c.tool === 'start_timer')).toBe(false)
+})
+
+test('/track STOP stops, in any case', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'Fix login' })
+  const made = calls.filter((c) => c.tool === 'create_task').length
+  await $.command.run({ command: 'track', args: 'STOP' })
+  expect(calls.filter((c) => c.tool === 'create_task').length).toBe(made)
+  expect(calls.some((c) => c.tool === 'stop_timer')).toBe(true)
+})
+
+test('/clear keeps the timer and the clock: the person goes on working', async ($, on) => {
+  const calls: Call[] = []
+  const clock = engine(on, [{ ...SCOREBOARD }], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'add Fix login' })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await $.session.end({ reason: 'clear', sessionId: 'me' })
+  expect(calls.some((c) => c.tool === 'stop_timer')).toBe(false)
+
+  await clock.advance(60 * 1000)
+  expect(await shows(ui, '2:16')).toBe(true)
+  await ui.unmount()
+})
+
+test('without git the plugin still starts, and a timer still stops', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls, { noGit: true })
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  expect(await rulesText($)).toContain('Git branch: unknown')
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const started = await $.command.run({ command: 'track', args: 'Fix login' })
+  expect(started.text).toContain('Tracking')
+  const stopped = await $.command.run({ command: 'track', args: 'stop' })
+  expect(stopped.text).toContain('Stopped')
+  expect(calls.find((c) => c.tool === 'stop_timer')?.args).toEqual({ task_id: 'new' })
+})
+
+test('a branch names an issue only where it reads like one', () => {
+  const github = 'git@github.com:knorkyapp/knorky.git'
+  const keyOf = (branch: string) => branchIssue(branch, github)?.key ?? null
+  // a tracker's key
+  expect(keyOf('feat/ENG-123-fix')).toBe('ENG-123')
+  expect(keyOf('fix-ENG-123-login')).toBe('ENG-123')
+  expect(keyOf('dan/eng-123-fix')).toBe('ENG-123')
+  expect(keyOf('eng-123')).toBe('ENG-123')
+  // a GitHub issue
+  expect(keyOf('gh-102')).toBe('knorkyapp/knorky#102')
+  expect(keyOf('GH-102')).toBe('knorkyapp/knorky#102')
+  expect(keyOf('issue-102')).toBe('knorkyapp/knorky#102')
+  expect(keyOf('feat/issues-7-x')).toBe('knorkyapp/knorky#7')
+  expect(keyOf('feat/102-fix')).toBe('knorkyapp/knorky#102')
+  // words that end in a number
+  expect(keyOf('fix-login-2')).toBe(null)
+  expect(keyOf('update-node-20')).toBe(null)
+  expect(keyOf('release-1.2')).toBe(null)
+  expect(keyOf('main')).toBe(null)
+  // a GitHub prefix elsewhere names nothing
+  expect(branchIssue('gh-102', 'git@example.com:me/repo.git')).toBe(null)
+})
+
+test('the rules follow the branch the session moves to', async ($, on) => {
+  const world: World = {
+    branch: 'feat/101-first\n',
+    remote: 'git@github.com:knorkyapp/knorky.git\n',
+  }
+  engine(on, [], [], world)
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  expect(await rulesText($)).toContain('knorkyapp/knorky#101')
+
+  world.branch = 'feat/102-second\n'
+  const rules = await rulesText($)
+  expect(rules).toContain('Git branch: feat/102-second')
+  expect(rules).toContain('knorkyapp/knorky#102')
+  expect(rules).not.toContain('#101')
+})
+
+test("with nothing running overnight, yesterday's time is not today's", async ($, on) => {
+  const evening = new Date(2026, 9, 31, 23, 59).getTime()
+  const clock = engine(on, [{ ...SCOREBOARD }], [], { now: evening })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  await clock.advance(1000)
+  expect(await shows(ui, /today/)).toBe(true)
+  await ui.press({ key: 'pause' })
+  expect(await drawn(ui, 'start')).toBe(true)
+
+  // past midnight, no timer running: the total was yesterday's
+  await clock.advance(2 * 60 * 1000)
+  for (let i = 0; i < 50 && (await ui.find({ type: 'Text', text: /today/ })); i++) {
+    await new Promise((r) => setTimeout(r, 5))
+  }
+  expect(await ui.find({ type: 'Text', text: /today/ })).toBeUndefined()
+
+  // asked again, it shows today's
+  await ui.press({ key: 'refresh' })
+  expect(await shows(ui, /today/)).toBe(true)
+  await ui.unmount()
+})
+
+test('/track project prefers the exact name', async ($, on) => {
+  const projects = [
+    { id: 'p1', name: 'Web' },
+    { id: 'p2', name: 'Website' },
+  ]
+  engine(on, [], [], { projects })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const exact = await $.command.run({ command: 'track', args: 'project web' })
+  expect(exact.text).toBe("This repository's time goes to Web.")
+  const part = await $.command.run({ command: 'track', args: 'project webs' })
+  expect(part.text).toBe("This repository's time goes to Website.")
+  const both = await $.command.run({ command: 'track', args: 'project we' })
+  expect(both.text).toBe('Several match: Web, Website')
+})
+
+test('a server found on the minute says so, and is read before Claude relies on it', async ($, on) => {
+  const world: World = { tools: [] }
+  const clock = engine(on, [{ ...SCOREBOARD }], [], world)
+  on('prompt.compose', () => ({ sections: [] }))
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  world.tools = TOOLS
+  await clock.advance(60 * 1000)
+
+  // not read yet: the line does not claim that nothing runs
+  expect(await shows(ui, /connected/)).toBe(true)
+  expect(await ui.find({ type: 'Text', text: /not tracking/ })).toBeUndefined()
+
+  // the next prompt reads it first
+  expect(await rulesText($)).toContain('Running now: Fix the scoreboard')
+  expect(await drawn(ui, 'pause')).toBe(true)
+  await ui.unmount()
+})
+
+test('the update button reads a server found on the minute', async ($, on) => {
+  const world: World = { tools: [] }
+  const clock = engine(on, [{ ...SCOREBOARD }], [], world)
+  on('ui.render', ($, e) => {
+    const { Text } = $.ui.resolve(e)
+    return <Text>engine</Text>
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  world.tools = TOOLS
+  await clock.advance(60 * 1000)
+  expect(await shows(ui, /connected/)).toBe(true)
+
+  await ui.press({ key: 'refresh' })
+  expect(await drawn(ui, 'pause')).toBe(true)
+  await ui.unmount()
 })
 
 test('a GitHub issue number in the branch finds and links the task', async ($, on) => {

@@ -13,6 +13,7 @@ import {
   report,
   rulesText,
   todayMs,
+  unlessFailed,
 } from './helpers.ts'
 import type { BranchIssue, Row, StepUsage, Tokens } from './helpers.ts'
 
@@ -27,6 +28,8 @@ const project = atom({ plugin: 'knorky', key: 'project' } as const, null as Proj
 const refreshedAt = atom({ plugin: 'knorky', key: 'refreshedAt' } as const, 0)
 const running = atom({ plugin: 'knorky', key: 'running' } as const, [] as Running[])
 const server = atom({ plugin: 'knorky', key: 'server' } as const, null as string | null)
+const startedTasks = atom({ plugin: 'knorky', key: 'startedTasks' } as const, [] as string[])
+const unread = atom({ plugin: 'knorky', key: 'unread' } as const, false)
 const sessionTask = atom(
   { plugin: 'knorky', key: 'sessionTask' } as const,
   null as SessionTask | null,
@@ -68,6 +71,7 @@ type Cancel = { cancel: () => void } | null
 let tick: Cancel = null
 let seconds: Cancel = null
 let repoKey = ''
+let remote = ''
 let branch = ''
 let issue: BranchIssue | null = null
 let folder = ''
@@ -92,14 +96,34 @@ async function initSessions($: Api) {
   mine = `${await $.session.id()}.json`
 }
 
-/** Writes which task this session tracks now; null for none. */
-async function claim($: Api, taskId: string | null) {
+/** Writes which tasks this session tracks now. */
+async function writeClaim($: Api, taskIds: string[]) {
   if (!folder) return
   try {
-    await $.fs.write(`${folder}/${mine}`, JSON.stringify({ task_id: taskId }))
+    // `task_id`: what a window on a version before 0.4.5 reads
+    const claimed = { task_id: taskIds.at(-1) ?? null, task_ids: taskIds }
+    await $.fs.write(`${folder}/${mine}`, JSON.stringify(claimed))
   } catch {
-    // without the file the session counts as alone: it stops its own timer
+    // without the file the session counts as alone: it stops its own timers
   }
+}
+
+/** The timers that run on tasks this session started. */
+async function ownTimers($: Api) {
+  const started = await read($, startedTasks)
+  return (await read($, running)).filter((r) => started.includes(r.task_id))
+}
+
+async function claim($: Api) {
+  await writeClaim(
+    $,
+    (await ownTimers($)).map((r) => r.task_id),
+  )
+}
+
+/** Notes that this session started the task's timer: it ends with the session. */
+async function rememberStarted($: Api, taskId: string) {
+  await update($, startedTasks, (ids) => (ids.includes(taskId) ? ids : [...ids, taskId]))
 }
 
 /** Whether another session tracks the task, by a file written lately. */
@@ -109,8 +133,11 @@ async function sharedWithOthers($: Api, taskId: string): Promise<boolean> {
     const now = await $.clock.now()
     for (const f of await $.fs.list(folder)) {
       if (f.name === mine || f.kind !== 'file' || now - f.mtimeMs > FRESH_MS) continue
-      const claimed = JSON.parse(await $.fs.read(`${folder}/${f.name}`)) as { task_id?: unknown }
-      if (claimed.task_id === taskId) return true
+      const claimed = JSON.parse(await $.fs.read(`${folder}/${f.name}`)) as {
+        task_id?: unknown
+        task_ids?: unknown[]
+      }
+      if ((claimed.task_ids ?? [claimed.task_id]).includes(taskId)) return true
     }
   } catch {
     // no folder yet, or a file being written: as if alone
@@ -120,8 +147,17 @@ async function sharedWithOthers($: Api, taskId: string): Promise<boolean> {
 
 /** What was committed since the entry started, as its note; null for nothing. */
 async function commitNote($: Api, since: string): Promise<string | null> {
-  const ran = await $.process.run(['git', 'log', '--no-merges', '--format=%ct%x09%s', '-n', '200'])
+  const ran = await unlessFailed(
+    $.process.run(['git', 'log', '--no-merges', '--format=%ct%x09%s', '-n', '200']),
+  )
   return noteFromLog(gitOutput(ran), since)
+}
+
+/** The branch the session is on now, and the issue it names. */
+async function readBranch($: Api) {
+  const ran = await unlessFailed($.process.run(['git', 'branch', '--show-current']))
+  branch = gitOutput(ran)
+  issue = branchIssue(branch, remote)
 }
 
 /** Calls one of the server's tools; its JSON answer, or an Error. */
@@ -178,6 +214,7 @@ async function refresh($: Api) {
     await update($, onBreak, () => now.break !== null)
     await update($, breakHm, () => now.break?.hm ?? null)
     await update($, error, () => null)
+    await update($, unread, () => false)
     const day = localDay(at)
     const total = await daySeconds($, day)
     await update($, dayTotal, () => (total === null ? null : { day, seconds: total }))
@@ -198,8 +235,9 @@ async function startTask($: Api, task: SessionTask, split: boolean) {
     keep_others_running: split,
   })) as { stopped?: { task: string }[] }
   await update($, sessionTask, () => task)
-  await claim($, task.id)
+  await rememberStarted($, task.id)
   await refresh($)
+  await claim($)
   if (split) return `Tracking, split with the others: ${task.title}`
   const stopped = (result?.stopped ?? []).map((s) => s.task)
   return stopped.length
@@ -218,27 +256,36 @@ async function findOrCreate($: Api, p: Project, title: string): Promise<SessionT
   return { id: made.task.id, title: made.task.title }
 }
 
-/**
- * Stops this session's task if it runs, with what was committed meanwhile as
- * its note; what it said, or null. `unlessShared`: not while another session
- * tracks the same task.
- */
-async function stopSessionTask($: Api, unlessShared: boolean) {
+/** Stops the timer, with what was committed meanwhile as its note. */
+async function stopEntry($: Api, entry: Running) {
+  const note = await commitNote($, entry.started_at)
+  await call($, 'stop_timer', { task_id: entry.task_id, ...(note ? { note } : {}) })
+}
+
+/** Stops this session's task if it runs; what it said, or null. */
+async function stopSessionTask($: Api) {
   const task = await read($, sessionTask)
   const entry = task && (await read($, running)).find((r) => r.task_id === task.id)
   if (!task || !entry) return null
-  if (unlessShared && (await sharedWithOthers($, task.id))) return null
-  const note = await commitNote($, entry.started_at)
-  await call($, 'stop_timer', { task_id: task.id, ...(note ? { note } : {}) })
-  await claim($, null)
+  await stopEntry($, entry)
   await refresh($)
+  await claim($)
   return `Stopped: ${task.title}`
+}
+
+/** The session is over: its timers end, but for one another session tracks too. */
+async function stopOwnTimers($: Api) {
+  const stops = (await ownTimers($)).map(async (entry) => {
+    if (!(await sharedWithOthers($, entry.task_id))) await stopEntry($, entry)
+  })
+  // one the server cannot stop keeps running, and any app can stop it
+  await Promise.allSettled(stops)
 }
 
 /** Pauses the task: its timer stops, and it stays the session's task. */
 async function pause($: Api, task: SessionTask) {
   await update($, sessionTask, () => task)
-  await stopSessionTask($, false)
+  await stopSessionTask($)
   return `Paused: ${task.title}`
 }
 
@@ -413,6 +460,14 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
       </Box>
     )
   }
+  if (await read($, unread)) {
+    return (
+      <Box>
+        <Text dimColor>⏱ connected · send a message or press </Text>
+        {updateButton}
+      </Box>
+    )
+  }
   if (await read($, onBreak)) {
     const breakTime = await read($, breakHm)
     return (
@@ -437,7 +492,7 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   const others = now.filter((r) => r.task_id !== task.id).length
   // until the second tick has run, the last check is the latest time known
   const askedAt = await read($, refreshedAt)
-  const clock = (await read($, nowMs)) || askedAt
+  const clock = Math.max(await read($, nowMs), askedAt)
   const today = await read($, dayTotal)
   // past midnight the day's total is yesterday's until the server is asked again
   const ms =
@@ -489,10 +544,11 @@ async function pressBand($: Api, element: string): Promise<string | null> {
   return startTask($, task, element === 'add')
 }
 
-/** Moves the clock on, while something runs. */
+/** Moves the clock on, while something runs and when a new day starts. */
 async function countSecond($: Api) {
-  if ((await read($, running)).length === 0) return
   const ms = await $.clock.now()
+  const isNewDay = localDay(ms) !== localDay(await read($, nowMs))
+  if (!isNewDay && (await read($, running)).length === 0) return
   await update($, nowMs, () => ms)
 }
 
@@ -517,11 +573,10 @@ async function everyMinute($: Api) {
   if (!(await read($, server))) {
     const found = await findServer($)
     if (!found) return
+    await update($, unread, () => true)
     await update($, server, () => found)
   }
-  const task = await read($, sessionTask)
-  const isRunning = task && (await read($, running)).some((r) => r.task_id === task.id)
-  await claim($, isRunning ? task.id : null)
+  await claim($)
 }
 
 /**
@@ -530,7 +585,10 @@ async function everyMinute($: Api) {
  */
 async function ensureServer($: Api) {
   const known = await read($, server)
-  if (known) return known
+  if (known) {
+    if (await read($, unread)) await refresh($)
+    return known
+  }
   const found = await findServer($)
   if (!found) return null
   await update($, server, () => found)
@@ -550,6 +608,7 @@ async function defaultMode($: Api): Promise<'split' | 'only'> {
 
 /** The rules Claude follows, with what it needs to know about this session. */
 async function rules($: Api, name: string) {
+  await readBranch($)
   return rulesText({
     name,
     project: await read($, project),
@@ -591,9 +650,12 @@ async function track($: Api, args: string): Promise<string> {
     lines.push(`Your time in Knorky: ${APP_URL}`)
     return lines.join('\n')
   }
-  if (args === 'stop') {
-    return (await stopSessionTask($, false)) ?? 'This session tracks nothing that runs.'
+  if (/^stop$/i.test(args)) {
+    return (await stopSessionTask($)) ?? 'This session tracks nothing that runs.'
   }
+  // a word alone is no task: as a title it would stop the other timers
+  if (/^add$/i.test(args)) return '/track add <task>'
+  if (/^project$/i.test(args)) return '/track project <name>'
   const chosen = /^default(?:\s+(\S+))?$/i.exec(args)
   if (chosen) {
     const value = chosen[1]?.toLowerCase()
@@ -610,7 +672,9 @@ async function track($: Api, args: string): Promise<string> {
   const wanted = /^project\s+(.+)$/i.exec(args)?.[1]
   if (wanted) {
     const all = (await call($, 'list_projects')) as Project[]
-    const hit = all.filter((x) => x.name.toLowerCase().includes(wanted.toLowerCase()))
+    const name = wanted.toLowerCase()
+    const exact = all.filter((x) => x.name.toLowerCase() === name)
+    const hit = exact.length ? exact : all.filter((x) => x.name.toLowerCase().includes(name))
     const [only] = hit
     if (hit.length !== 1 || !only) {
       return hit.length
@@ -634,10 +698,10 @@ export const register: Register = (on) => {
     const found = await findServer($)
     await update($, server, () => found)
 
-    const remote = gitOutput(await $.process.run(['git', 'remote', 'get-url', 'origin']))
+    const origin = await unlessFailed($.process.run(['git', 'remote', 'get-url', 'origin']))
+    remote = gitOutput(origin)
     repoKey = remote || (await $.session.root())
-    branch = gitOutput(await $.process.run(['git', 'branch', '--show-current']))
-    issue = branchIssue(branch, remote)
+    await readBranch($)
     const saved = (await $.store.get(`project:${repoKey}`)) as Project | undefined
     await update($, project, () => saved ?? null)
     await initSessions($)
@@ -665,14 +729,13 @@ export const register: Register = (on) => {
   })
 
   on('session.end', async ($, e, next) => {
+    // the conversation changes, Claude Code goes on, and so does the work:
+    // no new session.start follows, so the clocks and the timers stay
+    if (e.reason === 'clear' || e.reason === 'resume') return next(e)
     tick?.cancel()
     seconds?.cancel()
-    try {
-      await stopSessionTask($, true)
-    } catch {
-      // the server cannot be reached: the timer keeps running, any app can stop it
-    }
-    await claim($, null)
+    await stopOwnTimers($)
+    await writeClaim($, [])
     return next(e)
   })
 
@@ -734,7 +797,8 @@ export const register: Register = (on) => {
       await refresh($)
       const title = (await read($, running)).find((r) => r.task_id === id)?.task ?? 'task'
       await update($, sessionTask, () => ({ id, title }))
-      await claim($, id)
+      await rememberStarted($, id)
+      await claim($)
     } else if (
       ['stop_timer', 'stop_all_timers', 'start_break', 'end_break', 'set_task_done'].includes(tool)
     ) {

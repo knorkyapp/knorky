@@ -13,10 +13,11 @@ you work with Claude on your Knorky account.
   key like `ENG-123`, or a GitHub issue number (`feat/102-…`, `gh-102`).
 - **One project per repository.** Claude asks once which project a
   repository's work goes to, and remembers it.
-- **Timers stop with the session.** When the session ends, the session's
-  timer ends. A quiet session keeps its timer: time without prompts, such
-  as testing in a browser, is work too. When another Claude Code window
-  tracks the same task, its timer keeps running.
+- **Timers stop with the session.** When the session ends, every timer it
+  started ends. `/clear` and `/resume` end no timer, as you go on working. A
+  quiet session keeps its timers: time without prompts, such as testing in a
+  browser, is work too. When another Claude Code window tracks the same task,
+  its timer keeps running. Timers you started in the app keep running.
 - **Breaks only when you use them.** Claude starts a break ("I'm off to
   lunch") only while breaks are switched on in the app (Settings → Tracking,
   off at first); otherwise it stops the timers.
@@ -79,8 +80,9 @@ or, with none running:
 ⏱ not tracking · /track <task>
 ```
 
-That line is the check: it shows only once the plugin reaches the server.
-Run `/track` to see what runs and which project this repository uses.
+That line is the check: it shows only once the plugin reaches the server. If
+it says `⏱ connected`, the plugin found the server by itself and has not read
+your timers yet: press ↻ or send a message. Run `/track` to see what runs and which project this repository uses.
 
 If you also added Knorky as a connector on claude.ai, `/mcp` lists it too, as
 `claude.ai Knorky`. Turn it off there, for Claude Code only: the plugin cannot
@@ -233,8 +235,8 @@ mcp__plugin_knorky_knorky__record_agent_work
 - `git remote get-url origin`, once per session: the key under which it
   remembers this repository's project. The address also lets a GitHub issue
   number in the branch name find its task.
-- `git branch --show-current`, once per session: to find an issue in the
-  branch name.
+- `git branch --show-current`, when the session starts and whenever Claude's
+  rules are written: to find an issue in the branch name.
 - `git log --no-merges --format=%ct%x09%s -n 200`, when the plugin stops a
   timer: the commits' times and titles. Those made since the timer started go
   in the entry's note.
@@ -283,7 +285,7 @@ permission rules.
 | `turn.step`      | Reads each model request's token counts and passes the result on unchanged.                                                                                                                                                                                                                                                                                                                            |
 | `turn.complete`  | Saves and sends Claude's own work and reads the running timers again.                                                                                                                                                                                                                                                                                                                                  |
 | `session.start`  | Runs the two `git` reads above, registers `/track` and `remember_project`, and starts the plugin's clocks.                                                                                                                                                                                                                                                                                             |
-| `session.end`    | Stops this session's timer, unless another window tracks the same task.                                                                                                                                                                                                                                                                                                                                |
+| `session.end`    | Stops every timer this session started, unless another window tracks the same task. On `/clear` and `/resume` it stops none.                                                                                                                                                                                                                                                                           |
 
 The plugin has no hook on permission checks: your own rules and permission
 mode decide on every tool call.

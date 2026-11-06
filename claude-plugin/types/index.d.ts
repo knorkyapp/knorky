@@ -27,6 +27,10 @@ declare module 'claude-code' {
       breakHm: string | null
       project: Project | null
       sessionTask: SessionTask | null
+      /** The tasks this session started a timer on, which end with it. */
+      startedTasks: string[]
+      /** The server was found from a timer, which may not call it: not read yet. */
+      unread: boolean
       error: string | null
       nowMs: number
       /** When `running` was last read from the server. */
