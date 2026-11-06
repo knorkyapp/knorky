@@ -5,11 +5,12 @@
   "author": {
     "name": "Knorky"
   },
-  "homepage": "https://github.com/knorkyapp/knorky/blob/main/claude-plugin/README.md",
+  "homepage": "https://knorky.com",
+  "documentationUrl": "https://knorky.com/en/docs/claude-code-plugin/",
   "repository": "https://github.com/knorkyapp/knorky",
   "license": "AGPL-3.0-or-later",
   "privacyPolicyUrl": "https://knorky.com/privacy/",
   "termsOfServiceUrl": "https://knorky.com/terms/",
-  "supportUrl": "mailto:support@knorky.com",
+  "supportUrl": "https://knorky.com/en/docs/claude-code-plugin/#support",
   "keywords": ["time tracking", "timer", "mcp"]
 }

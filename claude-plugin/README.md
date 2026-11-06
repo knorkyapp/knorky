@@ -1,7 +1,10 @@
 # Knorky for Claude Code
 
 A plugin for [Claude Code](https://claude.com/claude-code) that tracks the time
-you work with Claude on your Knorky account.
+you work with Claude on your Knorky account. The documentation is on
+[knorky.com](https://knorky.com/en/docs/claude-code-plugin/), also
+[in German](https://knorky.com/docs/claude-code-plugin/). For help, write to
+[support@knorky.com](mailto:support@knorky.com).
 
 - **A timer above the prompt**, like the app's player: ▶ and ⏸, the task and
   its project, and the time you worked today on all tasks, in hours and
@@ -40,7 +43,7 @@ Contents: [What you need](#what-you-need) · [Install](#install) ·
 - [Claude Code](https://claude.com/claude-code), in a terminal, an editor or
   the Claude desktop app.
 - A Knorky account whose plan includes the API. On the hosted service that
-  is the Cloud plan.
+  is the Plus plan.
 - A git repository to work in is usual, but not needed: without one, the
   project is remembered for the folder.
 
@@ -112,9 +115,9 @@ stays on for claude.ai and your phone.
 4. **Work.** When the work moves to something clearly different, Claude
    starts that task's timer the same way. When you say the work is done,
    Claude stops the timer with a one-line note.
-5. **Leave.** When you close the session, the timer ends by itself. Its
-   note lists the commits you made. Going away without closing it? Press ⏸
-   or say so.
+5. **Leave.** When you close the session, the timers it started end by
+   themselves. Their notes list the commits you made. Going away without
+   closing it? Press ⏸ or say so.
 
 Not happy with a task Claude chose? Name the right one: `/track <task>`.
 
@@ -252,7 +255,7 @@ server, and no other server's. The band and `/track` read
 `get_running_timers`, `get_time_totals`, `list_tasks` and `list_projects`. The
 band's buttons and `/track` use `create_task`, `start_timer`, `stop_timer` and
 `end_break`, when you press or type them. At the end of a session, `stop_timer`
-ends that session's timer. After each turn, `record_agent_work` sends Claude's
+ends the timers that session started. After each turn, `record_agent_work` sends Claude's
 own work. It also lists Claude Code's tools (`$.tool.list`), only to find the
 server by its tool names.
 
@@ -300,7 +303,7 @@ other call gets what the tool itself returned.
 
 **Files it writes.** One file per session,
 `plugin-sessions/knorky/<session id>.json` in Claude Code's configuration
-folder (`~/.claude`, or `CLAUDE_CONFIG_DIR`), holding the id of the task the
+folder (`~/.claude`, or `CLAUDE_CONFIG_DIR`), holding the ids of the tasks the
 session tracks. It reads that folder's other files to see whether another
 window tracks the same task. It edits no build, start-up, settings or
 instructions file. Its other data is in Claude Code's plugin storage.
@@ -311,7 +314,7 @@ On your computer, in Claude Code's plugin storage: the project chosen for
 each repository (keyed by the repository's `origin` address); and each session's agent work per day and task (time,
 turns, token counts and the models' names, never what was said), kept for
 a week so a report that could not be sent goes later. In `~/.claude/plugin-sessions/knorky/`, one
-small file per session naming the task it tracks, so two windows on one
+small file per session naming the tasks it tracks, so two windows on one
 task know of each other. Everything else stays on the server, which the
 plugin reaches only through the server's own tools.
 

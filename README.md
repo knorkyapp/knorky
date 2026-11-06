@@ -71,9 +71,9 @@ when you stop. Type this at the prompt of Claude Code:
 /plugin install knorky --marketplace knorkyapp/knorky
 ```
 
-It needs a Knorky account with the Cloud plan. How to sign in, the
+It needs a Knorky account with the Plus plan. How to sign in, the
 commands, and what to do when something is wrong:
-[claude-plugin/README.md](claude-plugin/README.md).
+[the documentation](https://knorky.com/en/docs/claude-code-plugin/).
 
 ## Your data
 
