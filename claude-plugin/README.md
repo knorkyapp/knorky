@@ -290,9 +290,13 @@ permission rules.
 The plugin has no hook on permission checks: your own rules and permission
 mode decide on every tool call.
 
-**Tools it stands in for.** One: `remember_project`, the plugin's own tool,
-which the plugin answers itself by saving the project. It stands in for no tool
-of Claude Code's or of the server's.
+**Tools it stands in for.** One: `remember_project`, the tool the plugin itself
+adds. Whenever Claude calls it, after you have named a repository's project,
+the plugin answers in the tool's place by saving the project on your computer;
+Claude Code asks plugins to serve their own tools this way. Whenever Claude
+itself calls the server's `record_agent_work`, the plugin answers with a refusal,
+as that report is the plugin's to send. It stands in for no other tool, and every
+other call gets what the tool itself returned.
 
 **Files it writes.** One file per session,
 `plugin-sessions/knorky/<session id>.json` in Claude Code's configuration
