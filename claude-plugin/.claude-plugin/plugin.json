@@ -9,5 +9,7 @@
   "repository": "https://github.com/knorkyapp/knorky",
   "license": "AGPL-3.0-or-later",
   "privacyPolicyUrl": "https://knorky.com/privacy/",
+  "termsOfServiceUrl": "https://knorky.com/terms/",
+  "supportUrl": "mailto:support@knorky.com",
   "keywords": ["time tracking", "timer", "mcp"]
 }
