@@ -2,7 +2,7 @@
 // in register.tsx: the plugin directory reads calls on `$` only where `$` is
 // passed to a function of the same file.
 
-import type { Project, Running, SessionTask } from '../types'
+import type { Project, Running, SessionTask } from '../types/index.d.ts'
 
 // A tracker's issue key in a branch name: feat/ENG-123-fix
 const ISSUE_KEY = /\b([A-Za-z][A-Za-z0-9]+-\d+)\b/

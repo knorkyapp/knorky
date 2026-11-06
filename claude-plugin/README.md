@@ -340,6 +340,8 @@ claude plugin validate claude-plugin
 claude plugin test claude-plugin
 ```
 
+Imports always name the file's extension: `./helpers.ts`, never `./helpers`.
+
 The hooks are in `hooks/register.tsx`, with everything that calls Claude Code;
 plain functions are in `hooks/helpers.ts`. The state they keep is in
 `types/index.d.ts`, the tests in `tests/`. Once a session has loaded the

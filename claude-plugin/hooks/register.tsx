@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput } from 'claude-code'
 
-import type { DayTotal, Project, Running, SessionTask } from '../types'
+import type { DayTotal, Project, Running, SessionTask } from '../types/index.d.ts'
 import {
   NO_TOKENS,
   addTokens,
@@ -13,8 +13,8 @@ import {
   report,
   rulesText,
   todayMs,
-} from './helpers'
-import type { BranchIssue, Row, StepUsage, Tokens } from './helpers'
+} from './helpers.ts'
+import type { BranchIssue, Row, StepUsage, Tokens } from './helpers.ts'
 
 // Values the band draws from; the server's answers are the truth, these only
 // mirror them for the session.
