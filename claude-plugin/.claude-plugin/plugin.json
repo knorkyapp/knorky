@@ -11,6 +11,6 @@
   "license": "AGPL-3.0-or-later",
   "privacyPolicyUrl": "https://knorky.com/privacy/",
   "termsOfServiceUrl": "https://knorky.com/terms/",
-  "supportUrl": "https://knorky.com/en/docs/claude-code-plugin/#support",
+  "supportUrl": "https://knorky.com/en/support/?topic=plugin",
   "keywords": ["time tracking", "timer", "mcp"]
 }

@@ -3,7 +3,8 @@
 A plugin for [Claude Code](https://claude.com/claude-code) that tracks the time
 you work with Claude on your Knorky account. The documentation is on
 [knorky.com](https://knorky.com/en/docs/claude-code-plugin/), also
-[in German](https://knorky.com/docs/claude-code-plugin/). For help, write to
+[in German](https://knorky.com/docs/claude-code-plugin/). For help, use the
+[support form](https://knorky.com/en/support/?topic=plugin) or write to
 [support@knorky.com](mailto:support@knorky.com).
 
 - **A timer above the prompt**, like the app's player: ▶ and ⏸, the task and
