@@ -30,6 +30,7 @@ Contents: [What you need](#what-you-need) · [Install](#install) ·
 [The timer above the prompt](#the-timer-above-the-prompt) ·
 [Commands](#commands) · [Claude's own work](#claudes-own-work) ·
 [When something is wrong](#when-something-is-wrong) ·
+[What the plugin does on your computer](#what-the-plugin-does-on-your-computer) ·
 [What it stores](#what-it-stores) · [Update or remove](#update-or-remove) ·
 [Your own server](#your-own-server) · [Developing](#developing)
 
@@ -203,8 +204,87 @@ stop it.
 **The time goes to the wrong project.** `/track project <name>` changes it
 for this repository.
 
-**In auto mode, the plugin's calls are refused.** Update the plugin: since
-0.3.3 its own calls to the server pass auto mode.
+**In auto mode, the line says the plugin's calls are refused.** The plugin
+leaves every permission decision to you. To let its calls through, allow the
+tools it uses in your Claude Code permission rules: `/permissions`, then
+**Allow**, one rule per tool:
+
+```
+mcp__plugin_knorky_knorky__get_running_timers
+mcp__plugin_knorky_knorky__get_time_totals
+mcp__plugin_knorky_knorky__list_tasks
+mcp__plugin_knorky_knorky__list_projects
+mcp__plugin_knorky_knorky__create_task
+mcp__plugin_knorky_knorky__start_timer
+mcp__plugin_knorky_knorky__stop_timer
+mcp__plugin_knorky_knorky__end_break
+mcp__plugin_knorky_knorky__record_agent_work
+```
+
+## What the plugin does on your computer
+
+**Programs it runs.** Only `git`, in the session's folder, to read:
+
+- `git remote get-url origin`, once per session: the key under which it
+  remembers this repository's project. The address also lets a GitHub issue
+  number in the branch name find its task.
+- `git branch --show-current`, once per session: to find an issue in the
+  branch name.
+- `git log --since=<when the timer started> --no-merges --format=%s`, when the
+  plugin stops a timer: the commit titles for the entry's note. Only the time
+  changes in this command.
+
+It runs no other program and no shell, and it fetches and runs no code.
+
+**Tools it runs itself.** `$.mcp.call` calls these tools of the Knorky MCP
+server, and no other server's. The band and `/track` read
+`get_running_timers`, `get_time_totals`, `list_tasks` and `list_projects`. The
+band's buttons and `/track` use `create_task`, `start_timer`, `stop_timer` and
+`end_break`, when you press or type them. At the end of a session, `stop_timer`
+ends that session's timer. After each turn, `record_agent_work` sends Claude's
+own work. It also lists Claude Code's tools (`$.tool.list`), only to find the
+server by its tool names.
+
+**What it sends, and where.** Everything goes to the Knorky MCP server at
+`https://api.knorky.com/mcp`, over the connection you signed in to, and to
+nowhere else. Knorky's [privacy policy](https://knorky.com/privacy/) covers it.
+
+- Task titles, task and project ids, and timer starts and stops.
+- Timer notes: the commit titles above, or the note Claude writes when you say
+  the work is done.
+- Your time zone and today's date, to ask for today's total.
+- Per day and task, Claude's own work: turn time, turn count, token counts, the
+  main model's name, a session id and the agent's name, `claude-code`.
+
+It sends no prompts, answers, code or file contents. Claude itself may call
+the server's other tools during your work, under your permission rules.
+
+**What its hooks do.**
+
+| Hook             | What it decides or changes                                                                                                                                                                                                                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `prompt.compose` | Adds one section to Claude's system prompt: the tracking rules, this repository's project, the branch, this session's task and what runs. They tell Claude to find or create a task and start its timer without asking first. Nothing else in the prompt changes.                                                                                                                                      |
+| `tool.call`      | Sees every tool call by name and passes each one on unchanged, with two exceptions: it refuses Claude's own calls of `record_agent_work`, and it answers `remember_project` itself. After a call to the Knorky server that changes a timer it reads the running timers again, so the band follows. After `start_timer` it notes that task as this session's. It reads no other tool's input or result. |
+| `tool.describe`  | Marks `record_agent_work` as deferred, so Claude does not see it among its usual tools. No other tool changes.                                                                                                                                                                                                                                                                                         |
+| `ui.render`      | Draws the line above the prompt once the server is connected. Otherwise it leaves that place as it was.                                                                                                                                                                                                                                                                                                |
+| `turn.step`      | Reads each model request's token counts and passes the result on unchanged.                                                                                                                                                                                                                                                                                                                            |
+| `turn.complete`  | Saves and sends Claude's own work and reads the running timers again.                                                                                                                                                                                                                                                                                                                                  |
+| `session.start`  | Runs the two `git` reads above, registers `/track` and `remember_project`, and starts the plugin's clocks.                                                                                                                                                                                                                                                                                             |
+| `session.end`    | Stops this session's timer, unless another window tracks the same task.                                                                                                                                                                                                                                                                                                                                |
+
+The plugin has no hook on permission checks: your own rules and permission
+mode decide on every tool call.
+
+**Tools it stands in for.** One: `remember_project`, the plugin's own tool,
+which the plugin answers itself by saving the project. It stands in for no tool
+of Claude Code's or of the server's.
+
+**Files it writes.** One file per session,
+`plugin-sessions/knorky/<session id>.json` in Claude Code's configuration
+folder (`~/.claude`, or `CLAUDE_CONFIG_DIR`), holding the id of the task the
+session tracks. It reads that folder's other files to see whether another
+window tracks the same task. It edits no build, start-up, settings or
+instructions file. Its other data is in Claude Code's plugin storage.
 
 ## What it stores
 
@@ -247,6 +327,7 @@ claude plugin validate claude-plugin
 claude plugin test claude-plugin
 ```
 
-The hooks are in `hooks/register.tsx`, the state they keep in
+The hooks are in `hooks/register.tsx`, with everything that calls Claude Code;
+plain functions are in `hooks/helpers.ts`. The state they keep is in
 `types/index.d.ts`, the tests in `tests/`. Once a session has loaded the
 plugin, `tsc -p claude-plugin` type-checks it.

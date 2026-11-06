@@ -515,11 +515,9 @@ test('/track finds a server that connected after the session started', async ($,
   expect(ran.text).not.toContain('No time-tracking server')
 })
 
-// The kit does not raise tool.check for the plugin's own $.mcp.call, so only
-// the other half is shown here: the plugin waves through none of Claude's.
-test("Claude's calls to the server are left to auto mode", async ($, on) => {
+// The directory holds a plugin to this: the person's own rules decide.
+test('the plugin changes no permission decision', async ($, on) => {
   engine(on, [{ ...SCOREBOARD }], [])
-  // auto mode, as it answers a call no request of the person's asked for
   on('tool.check', () => ({ decision: 'deny' as const, reason: 'no verdict' }))
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
