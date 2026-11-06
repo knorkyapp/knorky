@@ -277,6 +277,95 @@ test('pause keeps the task in the band, and play resumes it alone', async ($, on
   await ui.unmount()
 })
 
+/** Waits until the band draws `text`. */
+async function shows(
+  ui: { find: (q: { type: 'Text'; text: string | RegExp }) => Promise<unknown> },
+  text: string | RegExp,
+) {
+  for (let i = 0; i < 50; i++) {
+    if (await ui.find({ type: 'Text', text })) return true
+    await new Promise((r) => setTimeout(r, 5))
+  }
+  return false
+}
+
+test('the update button reads the day and the timers again, changed elsewhere', async ($, on) => {
+  const toasts: string[] = []
+  const timers = [{ ...SCOREBOARD }, { ...SCOREBOARD, task_id: 't2', task: 'Mow the lawn' }]
+  const world: World = { todayMinutes: 135 }
+  engine(on, timers, [], world)
+  on('ui.toast', (_, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await ui.find({ type: 'Text', text: '2:15' })).toBeDefined()
+  expect((await ui.find({ type: 'Button', key: 'pause' }))?.text).toBe('⏸ +1')
+
+  // meanwhile, in the app: more time, and the other timer stopped
+  world.todayMinutes = 190
+  timers.splice(1, 1)
+  await ui.press({ key: 'refresh' })
+
+  expect(await shows(ui, '3:10')).toBe(true)
+  expect((await ui.find({ type: 'Button', key: 'pause' }))?.text).toBe('⏸')
+  expect(toasts).toEqual(['Updated'])
+  await ui.unmount()
+})
+
+test('the update button is there with no timer and on a break, and starts none', async ($, on) => {
+  const calls: Call[] = []
+  const timers: Timer[] = []
+  const world: World = {}
+  engine(on, timers, calls, world)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+  expect(await shows(ui, /not tracking/)).toBe(true)
+  expect(await ui.find({ type: 'Button', key: 'refresh' })).toBeDefined()
+
+  // a timer started in the app shows after the press
+  timers.push({ ...SCOREBOARD })
+  await ui.press({ key: 'refresh' })
+  expect(await drawn(ui, 'pause')).toBe(true)
+
+  // and so does a break
+  world.onBreak = true
+  await ui.press({ key: 'refresh' })
+  expect(await drawn(ui, 'endBreak')).toBe(true)
+  expect(await ui.find({ type: 'Button', key: 'refresh' })).toBeDefined()
+
+  const changed = ['start_timer', 'stop_timer', 'end_break', 'create_task']
+  expect(calls.filter((c) => changed.includes(c.tool))).toEqual([])
+  await ui.unmount()
+})
+
+test('after a server problem the update button tries again and clears it', async ($, on) => {
+  const toasts: string[] = []
+  const world: World = {}
+  engine(on, [{ ...SCOREBOARD }], [], world)
+  on('ui.toast', (_, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+
+  world.failOnce = new Set(['get_running_timers'])
+  await ui.press({ key: 'refresh' })
+  expect(await shows(ui, /time tracking: unreachable/)).toBe(true)
+  // the line says what went wrong: no "Updated" over it
+  expect(toasts).toEqual([])
+
+  await ui.press({ key: 'refresh' })
+  expect(await drawn(ui, 'pause')).toBe(true)
+  expect(await ui.find({ type: 'Text', text: /time tracking:/ })).toBeUndefined()
+  await ui.unmount()
+})
+
 test("the band shows today's time on all tasks, not the task's total", async ($, on) => {
   const calls: Call[] = []
   engine(on, [], calls)

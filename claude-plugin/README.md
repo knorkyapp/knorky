@@ -119,7 +119,7 @@ Not happy with a task Claude chose? Name the right one: `/track <task>`.
 ## The timer above the prompt
 
 ```
-[⏸ +1] Fix the login redirect · Website · today 2:40
+[⏸ +1] Fix the login redirect · Website · today 2:40 [↻]
 ```
 
 | Part                     | What it means                                                                                               |
@@ -135,6 +135,11 @@ Not happy with a task Claude chose? Name the right one: `/track <task>`.
 
 On a break the line reads `▶ on a break · 0:15`, and ▶ ends the break. When
 the server reports a problem, the line shows it: `⏱ time tracking: …`.
+
+**↻** at the end of the line asks the server again for what runs and for
+today's time, for example after you changed a timer in the app. The line also
+updates by itself when Claude finishes a turn; between those updates it counts
+on from the last answer.
 
 ## Commands
 

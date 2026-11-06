@@ -403,10 +403,13 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   const { Box, Button, Text } = $.ui.resolve(e)
   const now = await read($, running)
   const problem = await read($, error)
+  // in every state: what the server knows may have changed elsewhere
+  const updateButton = <Button key="refresh" label="↻" onPress={pressed} />
   if (problem) {
     return (
       <Box>
-        <Text dimColor>⏱ time tracking: {problem.slice(0, 80)}</Text>
+        <Text dimColor>⏱ time tracking: {problem.slice(0, 80)} </Text>
+        {updateButton}
       </Box>
     )
   }
@@ -415,7 +418,8 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
     return (
       <Box>
         <Button key="endBreak" label="▶" onPress={pressed} />
-        <Text dimColor> on a break{breakTime ? ` · ${breakTime}` : ''}</Text>
+        <Text dimColor> on a break{breakTime ? ` · ${breakTime}` : ''} </Text>
+        {updateButton}
       </Box>
     )
   }
@@ -424,7 +428,8 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
   if (!task) {
     return (
       <Box>
-        <Text dimColor>⏱ not tracking · /track &lt;task&gt;</Text>
+        <Text dimColor>⏱ not tracking · /track &lt;task&gt; </Text>
+        {updateButton}
       </Box>
     )
   }
@@ -463,12 +468,19 @@ async function drawBand($: Api, e: RenderInput<'AbovePrompt'>) {
         <Text dimColor>{hm(ms)}</Text>
       )}
       {!entry && others > 0 ? <Text dimColor> · +{others} running</Text> : null}
+      <Text> </Text>
+      {updateButton}
     </Box>
   )
 }
 
 /** What a press of the band's button `element` does; what to say, or null. */
 async function pressBand($: Api, element: string): Promise<string | null> {
+  if (element === 'refresh') {
+    await refresh($)
+    // a problem shows on the line itself
+    return (await read($, error)) ? null : 'Updated'
+  }
   if (element === 'endBreak') return endBreak($)
   const task = await shownTask($)
   if (!task) return null
