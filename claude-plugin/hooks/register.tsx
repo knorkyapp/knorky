@@ -120,8 +120,8 @@ async function sharedWithOthers($: Api, taskId: string): Promise<boolean> {
 
 /** What was committed since the entry started, as its note; null for nothing. */
 async function commitNote($: Api, since: string): Promise<string | null> {
-  const ran = await $.process.run(['git', 'log', `--since=${since}`, '--no-merges', '--format=%s'])
-  return noteFromLog(gitOutput(ran))
+  const ran = await $.process.run(['git', 'log', '--no-merges', '--format=%ct%x09%s', '-n', '200'])
+  return noteFromLog(gitOutput(ran), since)
 }
 
 /** Calls one of the server's tools; its JSON answer, or an Error. */
@@ -614,7 +614,7 @@ async function track($: Api, args: string): Promise<string> {
     const [only] = hit
     if (hit.length !== 1 || !only) {
       return hit.length
-        ? `Several match: ${hit.map((h) => h.name).join(', ')}`
+        ? `Several match: ${hit.map((match) => match.name).join(', ')}`
         : `No project matches "${wanted}". Projects: ${all.map((a) => a.name).join(', ')}`
     }
     await rememberProject($, { id: only.id, name: only.name })

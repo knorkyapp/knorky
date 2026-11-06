@@ -33,8 +33,10 @@ type World = {
   tools?: string[]
   branch?: string
   remote?: string
-  /** `git log` of the commits since the timer started, newest first. */
+  /** What `git log` prints: commit time and title per line, newest first. */
   log?: string
+  /** Fills with the commands the plugin runs. */
+  commands?: string[][]
   /** Files by path: the other sessions' claims. */
   files?: Map<string, { text: string; mtimeMs: number }>
   onBreak?: boolean
@@ -84,19 +86,22 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
       mcp: true,
     })),
   }))
-  on('process.run', (_, e) => ({
-    value: {
-      exitCode: 0,
-      stdout: e.argv.includes('remote')
-        ? (world.remote ?? 'git@example.com:me/repo.git\n')
-        : e.argv.includes('log')
-          ? (world.log ?? '')
-          : (world.branch ?? 'feat/ACME-1013-fix\n'),
-      stderr: '',
-      isStdoutTruncated: false,
-      isStderrTruncated: false,
-    },
-  }))
+  on('process.run', (_, e) => {
+    world.commands?.push([...e.argv])
+    return {
+      value: {
+        exitCode: 0,
+        stdout: e.argv.includes('remote')
+          ? (world.remote ?? 'git@example.com:me/repo.git\n')
+          : e.argv.includes('log')
+            ? (world.log ?? '')
+            : (world.branch ?? 'feat/ACME-1013-fix\n'),
+        stderr: '',
+        isStdoutTruncated: false,
+        isStderrTruncated: false,
+      },
+    }
+  })
   on('session.root', () => ({ value: '/repo' }))
   on('session.id', () => ({ value: 'me' }))
   on('env.get', (_, e) => ({ value: e.name === 'HOME' ? '/home/me' : undefined }))
@@ -683,7 +688,16 @@ test('a session that ends leaves a timer another session tracks', async ($, on) 
 
 test("a session that ends alone stops its timer, noting the session's commits", async ($, on) => {
   const calls: Call[] = []
-  engine(on, [], calls, { log: 'Add the tests\nFix the clock\n' })
+  const commands: string[][] = []
+  // the timer started at 12:00:00: the last line is from before it
+  const at = (time: string) => Date.parse(`2026-10-30T${time}Z`) / 1000
+  const log = [
+    `${at('12:00:03')}\tAdd the tests`,
+    `${at('12:00:00')}\tFix the clock`,
+    `${at('11:59:59')}\tOlder work`,
+    '',
+  ].join('\n')
+  engine(on, [], calls, { log, commands })
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   await $.command.run({ command: 'track', args: 'project acme' })
@@ -694,6 +708,20 @@ test("a session that ends alone stops its timer, noting the session's commits", 
     task_id: 'new',
     note: 'Commits: Fix the clock; Add the tests',
   })
+  // the whole command is fixed text, as the plugin directory reads it
+  expect(commands).toContainEqual(['git', 'log', '--no-merges', '--format=%ct%x09%s', '-n', '200'])
+})
+
+test('a timer with no commits since it started gets no note', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls, { log: `${Date.parse('2026-10-29T12:00:00Z') / 1000}\tOlder work\n` })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'Fix login' })
+  await $.session.end({ reason: 'other', sessionId: 'me' })
+
+  expect(calls.find((c) => c.tool === 'stop_timer')?.args).toEqual({ task_id: 'new' })
 })
 
 test('a GitHub issue number in the branch finds and links the task', async ($, on) => {

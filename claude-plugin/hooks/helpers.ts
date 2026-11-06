@@ -68,9 +68,21 @@ export function branchIssue(branch: string, remote: string): BranchIssue | null 
   return { key: github, github }
 }
 
-/** A `git log` of commit titles, newest first, as a note; null for nothing. */
-export function noteFromLog(log: string): string | null {
-  const titles = log.split('\n').filter(Boolean).reverse()
+/**
+ * The commits since `since` as a note; null for none. `log` holds a line per
+ * commit, newest first: its time in seconds, a tab, its title.
+ */
+export function noteFromLog(log: string, since: string): string | null {
+  const start = Date.parse(since) / 1000
+  const titles = log
+    .split('\n')
+    .map((line) => {
+      const tab = line.indexOf('\t')
+      return { at: Number(line.slice(0, tab)), title: line.slice(tab + 1) }
+    })
+    .filter((commit) => commit.title && commit.at >= start)
+    .map((commit) => commit.title)
+    .reverse()
   if (titles.length === 0) return null
   return `Commits: ${titles.join('; ')}`.slice(0, NOTE_MAX)
 }

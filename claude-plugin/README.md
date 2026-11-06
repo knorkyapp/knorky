@@ -235,11 +235,15 @@ mcp__plugin_knorky_knorky__record_agent_work
   number in the branch name find its task.
 - `git branch --show-current`, once per session: to find an issue in the
   branch name.
-- `git log --since=<when the timer started> --no-merges --format=%s`, when the
-  plugin stops a timer: the commit titles for the entry's note. Only the time
-  changes in this command.
+- `git log --no-merges --format=%ct%x09%s -n 200`, when the plugin stops a
+  timer: the commits' times and titles. Those made since the timer started go
+  in the entry's note.
 
-It runs no other program and no shell, and it fetches and runs no code.
+These three commands are fixed. It runs no other program and no shell, and it
+fetches and runs no code: nothing the server answers ever becomes a command.
+The server's answers are shown on the line and in `/track`. The titles of the
+running tasks and of this session's task, and the project's name and id, also
+go into the rules Claude reads (see `prompt.compose` below).
 
 **Tools it runs itself.** `$.mcp.call` calls these tools of the Knorky MCP
 server, and no other server's. The band and `/track` read
@@ -261,8 +265,12 @@ nowhere else. Knorky's [privacy policy](https://knorky.com/privacy/) covers it.
 - Per day and task, Claude's own work: turn time, turn count, token counts, the
   main model's name, a session id and the agent's name, `claude-code`.
 
-It sends no prompts, answers, code or file contents. Claude itself may call
-the server's other tools during your work, under your permission rules.
+The way out is `$.mcp.call`, which calls a tool on the MCP server over Claude
+Code's own connection to it. Though its hooks run during your conversation, the
+plugin reads from it only each turn's length and each model request's token
+counts and model name. It sends no prompts, answers, code or file contents.
+Claude itself may call the server's other tools during your work, under your
+permission rules.
 
 **What its hooks do.**
 
