@@ -2,7 +2,7 @@
 // in register.tsx: the plugin directory reads calls on `$` only where `$` is
 // passed to a function of the same file.
 
-import type { Project, Running, SessionTask } from '../types/index.d.ts'
+import type { FoundTask, Project, Running, SessionTask } from '../types/index.d.ts'
 
 // A tracker's issue key in a branch name, in capitals anywhere: fix-ENG-123
 const ISSUE_KEY_CAPITALS = /(?<![A-Za-z0-9])([A-Z][A-Z0-9]+-\d+)(?![A-Za-z0-9.])/
@@ -157,6 +157,14 @@ export function todayMs(seconds: number, anyRuns: boolean, now: number, askedAt:
   return seconds * 1000 + since
 }
 
+/**
+ * Whether a timer may run on the task: a timed one, or one from a server
+ * before task types. A to-do, or a type newer than this plugin, holds none.
+ */
+export function holdsTime(task: FoundTask) {
+  return task.task_type === undefined || task.task_type === 'timed'
+}
+
 /** h:mm, as the app shows a total. */
 export function hm(ms: number): string {
   const minutes = Math.floor(ms / 60000)
@@ -183,12 +191,13 @@ export function rulesText(session: {
     '# Time tracking',
     `The user tracks working time with the MCP server "${name}". Track this session's work there, without being asked:`,
     '- When the user starts a piece of work (a change, a fix, an investigation — not a quick question) and this session tracks no task that fits it: find the task and start its timer.',
-    `  Find it: ${issue ? `list_tasks with issue "${issue.key}" (the branch names it); else ` : ''}list_tasks with a search for the topic in the project below. None fits: create_task with a short title of what the work achieves${link}.`,
+    `  Find it: ${issue ? `list_tasks with issue "${issue.key}" (the branch names it); else ` : ''}list_tasks with a search for the topic in the project below; only a task whose task_type is "timed" fits, as a to-do holds no time. None fits: create_task with task_type "timed" and a short title of what the work achieves${link}.`,
     only
       ? '  Then start_timer with mode "only" (the user\'s default: the other timers stop), and tell the user in one line: "Tracking: <task>" (and what it stopped, if anything). Do not ask first.'
       : '  Then start_timer with mode "split" (the user\'s default: the task joins the running timers and the time is shared between them), and tell the user in one line: "Tracking, split: <task>". Do not ask first.',
     '  When the user names a task: "too", "also", "add", "in parallel" and "split" mean mode "split"; "instead", "only this" and "stop the others" mean mode "only". Without such a word, use the default above. If the user\'s words leave it unclear whether the other timers should stop, ask the user first.',
     '- When the work moves to something clearly different, start the timer of that task the same way. When the user says the work is done, stop_timer with a one-line note of what was done.',
+    '- When the user asks for a to-do (a task to tick off, without time): create_task with task_type "todo" in the project below, and start no timer on it; the server refuses time on a to-do. When the user says it is done, set_task_done.',
     p
       ? `- This repository's project: ${p.name} (project_id ${p.id}).`
       : '- This repository has no project yet. Before the first timer, ask the user once which project (list_projects shows them), then call remember_project.',

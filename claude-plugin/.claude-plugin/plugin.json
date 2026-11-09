@@ -1,7 +1,7 @@
 {
   "name": "knorky",
-  "version": "0.4.5",
-  "description": "Tracks your Claude Code work in Knorky: a timer above the prompt with play and pause, /track, and timers Claude starts for the work it does, per repository",
+  "version": "0.5.0",
+  "description": "Tracks your Claude Code work in Knorky: a timer above the prompt with play and pause, /track, timers Claude starts for the work it does, per repository, and to-dos with /todo",
   "author": {
     "name": "Knorky"
   },

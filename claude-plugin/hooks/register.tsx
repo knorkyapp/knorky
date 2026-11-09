@@ -1,13 +1,14 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderInput } from 'claude-code'
 
-import type { DayTotal, Project, Running, SessionTask } from '../types/index.d.ts'
+import type { DayTotal, FoundTask, Project, Running, SessionTask } from '../types/index.d.ts'
 import {
   NO_TOKENS,
   addTokens,
   branchIssue,
   gitOutput,
   hm,
+  holdsTime,
   localDay,
   noteFromLog,
   report,
@@ -245,15 +246,58 @@ async function startTask($: Api, task: SessionTask, split: boolean) {
     : `Tracking: ${task.title}`
 }
 
-/** The open task of that title in the project, or a new one. */
+/** The open timed task of that title in the project, or a new one. */
 async function findOrCreate($: Api, p: Project, title: string): Promise<SessionTask> {
-  const tasks = (await call($, 'list_tasks', { project_id: p.id, search: title })) as SessionTask[]
-  const same = tasks.find((t) => t.title.toLowerCase() === title.toLowerCase())
+  const tasks = (await call($, 'list_tasks', { project_id: p.id, search: title })) as FoundTask[]
+  // a to-do of the same title holds no time: its timer would be refused
+  const same = tasks.find((t) => holdsTime(t) && t.title.toLowerCase() === title.toLowerCase())
   if (same) return { id: same.id, title: same.title }
-  const made = (await call($, 'create_task', { project_id: p.id, title })) as {
-    task: SessionTask
-  }
+  // timed whatever the project's default: /track starts its timer next
+  const made = (await call($, 'create_task', {
+    project_id: p.id,
+    title,
+    task_type: 'timed',
+  })) as { task: SessionTask }
   return { id: made.task.id, title: made.task.title }
+}
+
+/** /todo and its words; what to say. */
+async function todo($: Api, args: string): Promise<string> {
+  const p = await read($, project)
+  if (!p) return 'Choose the project first: /track project <name>'
+  if (args === '') {
+    const open = (await call($, 'list_tasks', { project_id: p.id })) as FoundTask[]
+    const todos = open.filter((t) => t.task_type === 'todo')
+    if (!todos.length) return `No open to-dos in ${p.name}. Add one: /todo <title>`
+    return [`Open to-dos in ${p.name}:`, ...todos.map((t) => `- ${t.title}`)].join('\n')
+  }
+  const made = (await call($, 'create_task', {
+    project_id: p.id,
+    title: args,
+    task_type: 'todo',
+  })) as { task: SessionTask }
+  const { id, title } = made.task
+  // the answer names no type: a server before to-dos made a timed task
+  const found = (await call($, 'list_tasks', { project_id: p.id, search: title })) as FoundTask[]
+  const hit = found.find((t) => t.id === id)
+  if (hit && hit.task_type !== 'todo') {
+    return `Added as a timed task, as this server does not know to-dos yet: ${title}`
+  }
+  return `To-do added: ${title} · ${p.name}`
+}
+
+/** Runs a command that needs the server; what to say. */
+async function withServer($: Api, run: () => Promise<string>) {
+  try {
+    if (!(await ensureServer($))) {
+      return {
+        text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky:knorky and sign in.',
+      }
+    }
+    return { text: await run() }
+  } catch (err) {
+    return { text: `Time tracking: ${(err as Error).message}` }
+  }
 }
 
 /** Stops the timer, with what was committed meanwhile as its note. */
@@ -711,6 +755,11 @@ export const register: Register = (on) => {
       description:
         'Time tracking: /track (status), /track <task> (only this one), /track add <task> (split with the running ones), /track stop, /track default split | only (how Claude starts timers), /track project <name>',
     })
+    await $.command.register({
+      name: 'todo',
+      description:
+        "To-dos, tasks to tick off without time: /todo <title> adds one to this repository's project, /todo lists the open ones",
+    })
     await $.tool.register({
       name: 'remember_project',
       description:
@@ -821,18 +870,9 @@ export const register: Register = (on) => {
     return { result: `This repository's time now goes to ${project_name}.` }
   })
 
-  on('command.run', { command: 'track' }, async ($, e) => {
-    try {
-      if (!(await ensureServer($))) {
-        return {
-          text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky:knorky and sign in.',
-        }
-      }
-      return { text: await track($, e.args.trim()) }
-    } catch (err) {
-      return { text: `Time tracking: ${(err as Error).message}` }
-    }
-  })
+  on('command.run', { command: 'track' }, ($, e) => withServer($, () => track($, e.args.trim())))
+
+  on('command.run', { command: 'todo' }, ($, e) => withServer($, () => todo($, e.args.trim())))
 
   on('prompt.compose', async ($, e, next) => {
     const composed = await next(e)

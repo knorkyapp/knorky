@@ -22,6 +22,10 @@ you work with Claude on your Knorky account. The documentation is on
   quiet session keeps its timers: time without prompts, such as testing in a
   browser, is work too. When another Claude Code window tracks the same task,
   its timer keeps running. Timers you started in the app keep running.
+- **To-dos, without a timer.** `/todo <title>` adds a to-do to the
+  repository's project: a task you tick off, which holds no time. Or ask
+  Claude: "add a to-do: send the invoice". Claude never starts a timer on a
+  to-do, and tracks your work on timed tasks only.
 - **Breaks only when you use them.** Claude starts a break ("I'm off to
   lunch") only while breaks are switched on in the app (Settings → Tracking,
   off at first); otherwise it stops the timers.
@@ -158,8 +162,13 @@ on from the last answer.
 | `/track default split`  | Claude adds its tasks to the running timers (the default)                         |
 | `/track default only`   | Claude tracks only its task: the other timers stop                                |
 | `/track project <name>` | The project this repository's time goes to                                        |
+| `/todo <title>`         | Adds a to-do (a task without time) to this repository's project                   |
+| `/todo`                 | The open to-dos of this repository's project                                      |
 
 A task named with `/track` is found in the project by its title, or created.
+It is always a timed task: a to-do of the same title is passed over. To-dos
+need a server that knows them; an older one makes a timed task, and `/todo`
+says so.
 You can also just ask Claude: "add the docs task", "track this in parallel",
 "track only this", "stop the timer".
 
@@ -252,10 +261,10 @@ running tasks and of this session's task, and the project's name and id, also
 go into the rules Claude reads (see `prompt.compose` below).
 
 **Tools it runs itself.** `$.mcp.call` calls these tools of the Knorky MCP
-server, and no other server's. The band and `/track` read
+server, and no other server's. The band, `/track` and `/todo` read
 `get_running_timers`, `get_time_totals`, `list_tasks` and `list_projects`. The
-band's buttons and `/track` use `create_task`, `start_timer`, `stop_timer` and
-`end_break`, when you press or type them. At the end of a session, `stop_timer`
+band's buttons, `/track` and `/todo` use `create_task`, `start_timer`,
+`stop_timer` and `end_break`, when you press or type them. At the end of a session, `stop_timer`
 ends the timers that session started. After each turn, `record_agent_work` sends Claude's
 own work. It also lists Claude Code's tools (`$.tool.list`), only to find the
 server by its tool names.

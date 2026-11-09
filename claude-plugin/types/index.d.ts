@@ -14,6 +14,9 @@ export type Project = { id: string; name: string }
 /** The task this session tracks: one Claude or /track started here. */
 export type SessionTask = { id: string; title: string }
 
+/** A task as list_tasks finds it; a server before task types names no type. */
+export type FoundTask = SessionTask & { task_type?: string }
+
 /** Everything tracked today, on all tasks, as the server counted it. */
 export type DayTotal = { day: string; seconds: number }
 

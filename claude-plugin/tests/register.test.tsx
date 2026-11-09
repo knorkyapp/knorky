@@ -63,7 +63,13 @@ type World = {
   scoreboardSeconds?: number
   /** Minutes tracked today on all tasks, when not 2:15. */
   todayMinutes?: number
+  /** The open tasks list_tasks finds; the ones create_task makes join them. */
+  open?: OpenTask[]
+  /** A server from before task types: it names no type and makes every task timed. */
+  noTaskTypes?: boolean
 }
+
+type OpenTask = { id: string; title: string; project_id: string; task_type?: string }
 
 type StepUsage = {
   model: string
@@ -80,6 +86,7 @@ const NOW = Date.parse('2026-10-30T12:00:05Z')
 function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
   const store = world.store ?? new Map<string, unknown>()
   const files = world.files ?? new Map<string, { text: string; mtimeMs: number }>()
+  const open = world.open ?? []
   // waits are held until a test moves the clock
   const clock = mock.clock(on, { now: world.now ?? NOW })
   const now = () => clock.now()
@@ -162,6 +169,15 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
       if (at >= 0) timers.splice(at, 1)
     }
     if (e.tool === 'end_break') world.onBreak = false
+    if (e.tool === 'create_task') {
+      const type = world.noTaskTypes ? undefined : String(e.args.task_type ?? 'timed')
+      open.push({
+        id: 'new',
+        title: String(e.args.title),
+        project_id: String(e.args.project_id),
+        ...(type ? { task_type: type } : {}),
+      })
+    }
     if (e.tool === 'start_timer') {
       const known = { t1: 'Fix the scoreboard' } as Record<string, string>
       timers.push({
@@ -199,7 +215,12 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
                     tracked_seconds: 65 * 60,
                   },
                 ]
-              : []
+              : open.filter(
+                  (t) =>
+                    (!e.args.project_id || t.project_id === e.args.project_id) &&
+                    (!e.args.search ||
+                      t.title.toLowerCase().includes(String(e.args.search).toLowerCase())),
+                )
             : e.tool === 'create_task'
               ? { task: { id: 'new', title: e.args.title, project: 'Acme' } }
               : e.tool === 'get_time_totals'
@@ -575,6 +596,132 @@ test('a task /track creates gets its timer started', async ($, on) => {
   await $.command.run({ command: 'track', args: 'Fix login' })
 
   expect(calls.find((c) => c.tool === 'start_timer')?.args.task_id).toBe('new')
+})
+
+test('/track creates a timed task, whatever the project makes by default', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'Fix login' })
+
+  expect(calls.find((c) => c.tool === 'create_task')?.args.task_type).toBe('timed')
+})
+
+test('/track passes over a to-do of the same title: it holds no time', async ($, on) => {
+  const calls: Call[] = []
+  const open = [{ id: 'td', title: 'Fix login', project_id: 'p1', task_type: 'todo' }]
+  engine(on, [], calls, { open })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const said = await $.command.run({ command: 'track', args: 'fix login' })
+
+  expect(said.text).toBe('Tracking: fix login')
+  expect(calls.some((c) => c.tool === 'create_task')).toBe(true)
+  expect(calls.find((c) => c.tool === 'start_timer')?.args.task_id).toBe('new')
+})
+
+test("/track finds a timed task, and a server's task that names no type", async ($, on) => {
+  const calls: Call[] = []
+  const open = [
+    { id: 'tm', title: 'Fix login', project_id: 'p1', task_type: 'timed' },
+    { id: 'old', title: 'Write docs', project_id: 'p1' },
+  ]
+  engine(on, [], calls, { open })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  await $.command.run({ command: 'track', args: 'Fix login' })
+  await $.command.run({ command: 'track', args: 'Write docs' })
+
+  expect(calls.some((c) => c.tool === 'create_task')).toBe(false)
+  const started = calls.filter((c) => c.tool === 'start_timer').map((c) => c.args.task_id)
+  expect(started).toEqual(['tm', 'old'])
+})
+
+test('/todo <title> adds a to-do to the project and starts no timer', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const said = await $.command.run({ command: 'todo', args: '  Send the invoice ' })
+
+  expect(said.text).toBe('To-do added: Send the invoice · Acme')
+  const made = calls.find((c) => c.tool === 'create_task')?.args
+  expect(made).toEqual({ project_id: 'p1', title: 'Send the invoice', task_type: 'todo' })
+  expect(calls.some((c) => c.tool === 'start_timer')).toBe(false)
+})
+
+test('/todo lists the open to-dos of the project, not its timed tasks', async ($, on) => {
+  const open = [
+    { id: 'a', title: 'Send the invoice', project_id: 'p1', task_type: 'todo' },
+    { id: 'b', title: 'Fix login', project_id: 'p1', task_type: 'timed' },
+    { id: 'c', title: 'Call the bank', project_id: 'p1', task_type: 'todo' },
+  ]
+  engine(on, [], [], { open })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const listed = await $.command.run({ command: 'todo', args: '' })
+
+  expect(listed.text).toBe('Open to-dos in Acme:\n- Send the invoice\n- Call the bank')
+})
+
+test('/todo with none open says how to add one', async ($, on) => {
+  engine(on, [], [])
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const listed = await $.command.run({ command: 'todo', args: '' })
+
+  expect(listed.text).toBe('No open to-dos in Acme. Add one: /todo <title>')
+})
+
+test('/todo without a project asks for one and creates nothing', async ($, on) => {
+  const calls: Call[] = []
+  engine(on, [], calls)
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const said = await $.command.run({ command: 'todo', args: 'Send the invoice' })
+
+  expect(said.text).toBe('Choose the project first: /track project <name>')
+  expect(calls.some((c) => c.tool === 'create_task')).toBe(false)
+})
+
+test('/todo on a server before to-dos says the task it made is timed', async ($, on) => {
+  engine(on, [], [], { noTaskTypes: true })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  await $.command.run({ command: 'track', args: 'project acme' })
+  const said = await $.command.run({ command: 'todo', args: 'Send the invoice' })
+
+  expect(said.text).toBe(
+    'Added as a timed task, as this server does not know to-dos yet: Send the invoice',
+  )
+})
+
+test('without the server, /todo says how to connect it', async ($, on) => {
+  engine(on, [], [], { tools: [] })
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const said = await $.command.run({ command: 'todo', args: 'Send the invoice' })
+
+  expect(said.text).toContain('No time-tracking server is connected')
+})
+
+test('the rules track timed tasks only, and make a to-do without a timer', async ($, on) => {
+  engine(on, [], [])
+  on('prompt.compose', () => ({ sections: [] }))
+
+  await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
+  const rules = await rulesText($)
+  expect(rules).toContain('only a task whose task_type is "timed" fits')
+  expect(rules).toContain('create_task with task_type "timed"')
+  expect(rules).toContain('create_task with task_type "todo" in the project below')
+  expect(rules).toContain('start no timer on it')
 })
 
 test('without the server, /track says how to connect it', async ($, on) => {
