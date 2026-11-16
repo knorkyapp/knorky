@@ -5,7 +5,14 @@ your computer; an account and sync between devices are optional.
 
 **[Download for Windows](https://github.com/knorkyapp/knorky/releases/latest)** ·
 **[Web app](https://app.knorky.com)** ·
-**[knorky.com](https://knorky.com)**
+**[Website: knorky.com](https://knorky.com)** ·
+**[Docs](https://knorky.com/en/docs/)**
+
+The website is in German: [all features](https://knorky.com/funktionen/),
+[plans and prices](https://knorky.com/preise/),
+[guides](https://knorky.com/ratgeber/), [FAQ](https://knorky.com/faq/) and
+the [blog](https://knorky.com/blog/). The docs and support are in English
+too.
 
 ## See it in action
 
@@ -43,7 +50,8 @@ https://github.com/user-attachments/assets/e57ad17a-caf7-4e5c-91f6-347ccf2a720b
 - **Linear and GitHub** — type `#ENG-123` or `#42` in a task title to link
   the issue and see its status on the task.
 - **AI assistant and REST API** — connect Claude to start timers, create
-  tasks and ask about your time, or script it over HTTP.
+  tasks and ask about your time ([how to connect](https://knorky.com/en/docs/mcp/)),
+  or script it over HTTP ([REST API](https://knorky.com/en/docs/api/)).
 - **Keyboard first** — every command has a shortcut you can change;
   start/pause works system-wide.
 - **Backups and import** — scheduled backups to a folder you choose, import
@@ -57,6 +65,10 @@ The desktop app is available for **Windows**. Get the installer
 (`Knorky_<version>_x64-setup.exe`) from the
 [latest release](https://github.com/knorkyapp/knorky/releases/latest).
 The app updates itself after that; a running timer is never interrupted.
+
+Installation help and every release's notes are on the website:
+[download](https://knorky.com/download/) and
+[what's new](https://knorky.com/updates/) (both in German).
 
 There is no macOS, Linux or phone app yet. On a phone, the
 [web app](https://app.knorky.com) has a layout of its own.
@@ -79,7 +91,8 @@ commands, and what to do when something is wrong:
 
 Without an account, the desktop app works fully offline and contacts no
 server. Signing in adds sync across your devices. Usage statistics and error
-reports are off until you switch them on.
+reports are off until you switch them on. Details:
+[privacy policy](https://knorky.com/privacy/).
 
 ## Feedback and bugs
 
