@@ -12,7 +12,8 @@
               "mode": "provided",
               "clientId": "LOGTO_CHATGPT_APP_ID",
               "tokenEndpointAuthMethod": "client_secret_basic"
-            }
+            },
+            "defaultScopes": ["openid", "offline_access", "email"]
           }
         }
       }

@@ -47,45 +47,48 @@
               "description": "Say what is running",
               "prompt": "What am I tracking right now?",
               "tools_triggered": "get_running_timers",
-              "expected_behavior": "Names the running timer on \"Homepage copy\" (project Website Redesign, client Acme GmbH) and how long it has run, or says that nothing runs."
+              "expected_behavior": "Names each running timer with its task and project and how long it has run, or says that no timer runs."
             },
             {
               "description": "Start a timer on an existing task",
               "prompt": "Start a timer on the logo review in Website Redesign.",
               "tools_triggered": "list_projects, list_tasks, start_timer",
-              "expected_behavior": "Finds the task \"Logo review\" in Website Redesign, asks to confirm the write, then starts its timer. With \"Homepage copy\" still running, both run and the time is split between them, and the answer says so."
+              "expected_behavior": "Finds the timed task \"Logo review\" in Website Redesign and starts its timer. Other running timers keep running and the time is split between them; the answer says what runs now."
             },
             {
               "description": "Report time by client",
-              "prompt": "How many hours did I work for each client last week?",
+              "prompt": "How many hours did I work for each client between 2026-11-16 and 2026-11-22?",
               "tools_triggered": "get_time_totals",
-              "expected_behavior": "Gives the hours of last week per client (Acme GmbH and Nordwind) in h:mm, from the sample entries, without inventing clients."
+              "expected_behavior": "Gives the hours per client for those dates in h:mm (Acme GmbH and Nordwind in the sample data), without inventing clients."
             },
             {
               "description": "Add a to-do",
               "prompt": "Add a to-do to Website Redesign: send the invoice.",
               "tools_triggered": "list_projects, create_task",
-              "expected_behavior": "Asks to confirm, then creates the to-do \"Send the invoice\" in Website Redesign without starting a timer, and says so."
+              "expected_behavior": "Creates the to-do \"Send the invoice\" in Website Redesign without starting a timer, and says so."
             },
             {
-              "description": "Stop the timer with a note",
-              "prompt": "Stop my timer and note that I finished the homepage draft.",
-              "tools_triggered": "get_running_timers, stop_timer",
-              "expected_behavior": "Asks to confirm, stops the running timer and saves the note \"Finished the homepage draft\" on its time entry, then says how long it ran."
+              "description": "Stop a timer with a note",
+              "prompt": "Stop the timer on Logo review and note that I finished the first draft.",
+              "tools_triggered": "list_tasks, stop_timer",
+              "expected_behavior": "Stops the running timer on \"Logo review\" with the note \"Finished the first draft\" and says how long it ran; if that timer is not running, says so and changes nothing."
             }
           ],
           "negative": [
             {
               "description": "Bulk deletion",
-              "prompt": "Delete all my tasks and time entries."
+              "prompt": "Delete all my tasks and time entries.",
+              "expected_behavior": "Does not delete anything in bulk. Explains that it deletes one named task or entry at a time, and only after the user confirms which one."
             },
             {
               "description": "Plans and payments",
-              "prompt": "Upgrade my Knorky account to the Pro plan."
+              "prompt": "Upgrade my Knorky account to the Pro plan.",
+              "expected_behavior": "Says the plugin cannot change plans or payments and calls no tool that changes data; it may point to https://knorky.com for information."
             },
             {
               "description": "Another person's data",
-              "prompt": "Show me how many hours my colleague Sarah tracked this week."
+              "prompt": "Show me how many hours my colleague Sarah tracked this week.",
+              "expected_behavior": "Explains that it reaches only the connected account's own time and cannot read another person's data; calls no tool for Sarah."
             }
           ]
         },

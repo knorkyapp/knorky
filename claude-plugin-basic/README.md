@@ -10,7 +10,8 @@ Claude to track your work there. For help, use the
 - **Claude tracks by itself.** When you start a piece of work, Claude finds
   the task or creates it, starts its timer and tells you in one line. It does
   not ask first. An issue in the branch name finds the task linked to it: a
-  key like `ENG-123`, or a GitHub issue number (`feat/102-…`, `gh-102`).
+  key like `ENG-123`, or a GitHub issue number (`feat/102-…`, `gh-102`),
+  which Claude looks up with the repository's `origin` address.
 - **One project per repository.** Claude asks once which Knorky project the
   repository's work goes to. If Claude keeps a memory for the repository, it
   saves the answer there, so later sessions do not ask.
@@ -20,12 +21,8 @@ Claude to track your work there. For help, use the
 - **To-dos, without a timer.** `/todo <title>` adds a task you tick off,
   which holds no time.
 
-This is the plugin as listed in Claude's plugin directory. The full Knorky
-plugin, from Knorky's own marketplace, adds a live timer line above the
-prompt, stops the session's timers when the session ends, writes your commit
-titles into the time entries, and reports Claude's own work time and tokens
-(see [the full plugin](https://github.com/knorkyapp/knorky/tree/main/claude-plugin)). Install one of the two,
-not both.
+Knorky also publishes a fuller version of this plugin in its own
+marketplace. Install one of the two, not both.
 
 ## What you need
 
@@ -84,11 +81,14 @@ entry (`.mcp.json`). It has no hooks and runs no programs.
 The MCP server entry connects Claude Code to `https://api.knorky.com/mcp`,
 Knorky's server, after you sign in. Claude calls its tools under your
 Claude Code permission rules, as with any MCP server. What reaches the
-server is what those calls carry: task titles, project and task ids, timer
-starts and stops, the notes Claude writes on a timer, and dates. Nothing
-goes anywhere else. Knorky's [privacy policy](https://knorky.com/privacy/)
-covers it. The plugin stores nothing on your computer; Claude may save the
-repository's project in its own memory, as the skill asks.
+server is whatever those calls carry: task and to-do titles, search words,
+project, task and time-entry ids, timer starts and stops, break and timer
+notes Claude writes, dates and your time zone, and issue keys Claude reads
+from your git branch (with the `owner/repo` part of the `origin` address
+for a GitHub issue). Nothing goes anywhere else. Knorky's
+[privacy policy](https://knorky.com/privacy/) covers it. The plugin stores
+nothing on your computer; Claude may save the repository's project in its
+own memory, as the skill asks.
 
 ## Your own server
 

@@ -25,11 +25,12 @@ Time goes to one Knorky project per repository (or per folder, outside git).
 When the user starts a piece of work and this session tracks no task that
 fits it:
 
-1. Find the task. If the git branch names an issue (a key like `ENG-123`, or
-   a GitHub issue number as in `feat/102-…` or `gh-102`), call `list_tasks`
-   with that `issue`. Otherwise call `list_tasks` with a `search` for the
-   topic, in the project. Only a task whose `task_type` is `"timed"` fits: a
-   to-do holds no time.
+1. Find the task. If the git branch names an issue, call `list_tasks` with
+   that `issue`: a Linear-style key such as `ENG-123` as it is; a GitHub
+   issue number (as in `feat/102-…` or `gh-102`) as `owner/repo#102`, with
+   `owner/repo` from `git remote get-url origin`. Otherwise call
+   `list_tasks` with a `search` for the topic, in the project. Only a task
+   whose `task_type` is `"timed"` fits: a to-do holds no time.
 2. If none fits, call `create_task` in the project, with `task_type`
    `"timed"` and a short title of what the work achieves.
 3. Call `start_timer` with mode `"split"`: the task joins the running timers

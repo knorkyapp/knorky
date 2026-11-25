@@ -44,8 +44,9 @@ Secret** field, never into this folder.
 The review account needs a plan that includes the API, a password sign-in
 without email codes, and the sample data the test cases in `plugin.json`
 name: clients Acme GmbH and Nordwind; project Website Redesign (Acme GmbH)
-with the timed tasks "Homepage copy" (timer running) and "Logo review";
-time entries on both clients last week.
+with the timed task "Logo review"; and time entries on both clients
+between 2026-11-16 and 2026-11-22. The cases hold whether or not a timer
+runs when the reviewer starts.
 
 ## Updating
 
