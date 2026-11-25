@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "knorky": {
+      "type": "http",
+      "url": "https://api.knorky.com/mcp",
+      "oauth": {
+        "clientId": "zk1dhz74qjnvy3ff7c6ly",
+        "callbackPort": 33418
+      }
+    }
+  }
+}
