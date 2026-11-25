@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "knorky": {
+      "type": "streamable-http",
+      "url": "https://api.knorky.com/mcp",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "provided",
+              "clientId": "LOGTO_CHATGPT_APP_ID",
+              "tokenEndpointAuthMethod": "client_secret_basic"
+            }
+          }
+        }
+      }
+    }
+  }
+}

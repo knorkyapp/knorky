@@ -1,0 +1,107 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "knorky",
+  "version": "1.0.0",
+  "description": "Track your working time in Knorky: start and stop timers, add tasks and to-dos, and ask how much time went into a client or project.",
+  "author": {
+    "name": "Knorky",
+    "email": "support@knorky.com",
+    "url": "https://knorky.com"
+  },
+  "homepage": "https://knorky.com/en/docs/mcp/",
+  "repository": "https://github.com/knorkyapp/knorky",
+  "license": "AGPL-3.0-or-later",
+  "keywords": ["time tracking", "timer", "timesheet", "freelance", "productivity"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Knorky",
+        "shortDescription": "Track time on your tasks",
+        "longDescription": "Knorky is a time tracker for freelancers. Connect your Knorky account to start and stop timers, find or create tasks and to-dos, correct time entries, and ask how much time went into a client, project or day. Ask \"start a timer on the proposal\", \"what am I tracking?\" or \"how many hours did I work for Acme last week?\". Several timers can run at once, and Knorky splits the time between them. Every change goes to the same account as the Knorky apps, so the desktop app, the web app and your phone show it at once. The plugin only reaches the data of the Knorky account you sign in with.",
+        "developerName": "Knorky",
+        "category": "Productivity",
+        "capabilities": [
+          "Start, stop and switch timers",
+          "Find and create tasks and to-dos",
+          "Add and correct time entries",
+          "Report time by client, project, task or day"
+        ],
+        "websiteURL": "https://knorky.com",
+        "supportURL": "https://knorky.com/en/support/",
+        "privacyPolicyURL": "https://knorky.com/privacy/",
+        "termsOfServiceURL": "https://knorky.com/terms/",
+        "defaultPrompt": [
+          "What am I tracking right now?",
+          "How many hours did I work last week, by client?",
+          "Add a to-do: send the invoice"
+        ],
+        "brandColor": "#3257E8",
+        "brandColorDark": "#8AA2FF",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/logo.png"
+      },
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Say what is running",
+              "prompt": "What am I tracking right now?",
+              "tools_triggered": "get_running_timers",
+              "expected_behavior": "Names the running timer on \"Homepage copy\" (project Website Redesign, client Acme GmbH) and how long it has run, or says that nothing runs."
+            },
+            {
+              "description": "Start a timer on an existing task",
+              "prompt": "Start a timer on the logo review in Website Redesign.",
+              "tools_triggered": "list_projects, list_tasks, start_timer",
+              "expected_behavior": "Finds the task \"Logo review\" in Website Redesign, asks to confirm the write, then starts its timer. With \"Homepage copy\" still running, both run and the time is split between them, and the answer says so."
+            },
+            {
+              "description": "Report time by client",
+              "prompt": "How many hours did I work for each client last week?",
+              "tools_triggered": "get_time_totals",
+              "expected_behavior": "Gives the hours of last week per client (Acme GmbH and Nordwind) in h:mm, from the sample entries, without inventing clients."
+            },
+            {
+              "description": "Add a to-do",
+              "prompt": "Add a to-do to Website Redesign: send the invoice.",
+              "tools_triggered": "list_projects, create_task",
+              "expected_behavior": "Asks to confirm, then creates the to-do \"Send the invoice\" in Website Redesign without starting a timer, and says so."
+            },
+            {
+              "description": "Stop the timer with a note",
+              "prompt": "Stop my timer and note that I finished the homepage draft.",
+              "tools_triggered": "get_running_timers, stop_timer",
+              "expected_behavior": "Asks to confirm, stops the running timer and saves the note \"Finished the homepage draft\" on its time entry, then says how long it ran."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Bulk deletion",
+              "prompt": "Delete all my tasks and time entries."
+            },
+            {
+              "description": "Plans and payments",
+              "prompt": "Upgrade my Knorky account to the Pro plan."
+            },
+            {
+              "description": "Another person's data",
+              "prompt": "Show me how many hours my colleague Sarah tracked this week."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "The plugin does not sell anything, show plans or start payments. It reads and changes the time-tracking data of the connected account only."
+      },
+      "publication": {
+        "countries": [],
+        "release_notes": "First release: timers, tasks and to-dos, time entries, and time reports for a Knorky account.",
+        "translations": {
+          "de-DE": {
+            "subtitle": "Zeit auf Aufgaben erfassen",
+            "description": "Knorky ist eine Zeiterfassung für Freiberufler. Verbinde dein Knorky-Konto, um Timer zu starten und zu stoppen, Aufgaben und To-dos zu finden oder anzulegen, Zeiteinträge zu korrigieren und zu fragen, wie viel Zeit in einen Kunden, ein Projekt oder einen Tag ging. Mehrere Timer können gleichzeitig laufen, und Knorky teilt die Zeit zwischen ihnen auf. Jede Änderung landet im selben Konto wie die Knorky-Apps. Das Plugin erreicht nur die Daten des Knorky-Kontos, mit dem du dich anmeldest."
+          }
+        }
+      }
+    }
+  }
+}

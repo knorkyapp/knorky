@@ -93,6 +93,12 @@ rules and commands, as plain text with no code on your computer. It has no
 timer line above the prompt, and it cannot stop the timers when a session
 ends. Install one of the two, not both.
 
+## ChatGPT and Codex
+
+[openai-plugin/](openai-plugin/) is the package for OpenAI's plugin
+directory, which serves ChatGPT and Codex: the same hosted server and
+sign-in, and a skill with the rules for using its tools.
+
 ## Your data
 
 Without an account, the desktop app works fully offline and contacts no
