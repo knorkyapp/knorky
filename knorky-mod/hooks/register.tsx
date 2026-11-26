@@ -20,19 +20,19 @@ import type { BranchIssue, Row, StepUsage, Tokens } from './helpers.ts'
 
 // Values the band draws from; the server's answers are the truth, these only
 // mirror them for the session.
-const breakHm = atom({ plugin: 'knorky', key: 'breakHm' } as const, null as string | null)
-const dayTotal = atom({ plugin: 'knorky', key: 'dayTotal' } as const, null as DayTotal | null)
-const error = atom({ plugin: 'knorky', key: 'error' } as const, null as string | null)
-const nowMs = atom({ plugin: 'knorky', key: 'nowMs' } as const, 0)
-const onBreak = atom({ plugin: 'knorky', key: 'onBreak' } as const, false)
-const project = atom({ plugin: 'knorky', key: 'project' } as const, null as Project | null)
-const refreshedAt = atom({ plugin: 'knorky', key: 'refreshedAt' } as const, 0)
-const running = atom({ plugin: 'knorky', key: 'running' } as const, [] as Running[])
-const server = atom({ plugin: 'knorky', key: 'server' } as const, null as string | null)
-const startedTasks = atom({ plugin: 'knorky', key: 'startedTasks' } as const, [] as string[])
-const unread = atom({ plugin: 'knorky', key: 'unread' } as const, false)
+const breakHm = atom({ plugin: 'knorky-mod', key: 'breakHm' } as const, null as string | null)
+const dayTotal = atom({ plugin: 'knorky-mod', key: 'dayTotal' } as const, null as DayTotal | null)
+const error = atom({ plugin: 'knorky-mod', key: 'error' } as const, null as string | null)
+const nowMs = atom({ plugin: 'knorky-mod', key: 'nowMs' } as const, 0)
+const onBreak = atom({ plugin: 'knorky-mod', key: 'onBreak' } as const, false)
+const project = atom({ plugin: 'knorky-mod', key: 'project' } as const, null as Project | null)
+const refreshedAt = atom({ plugin: 'knorky-mod', key: 'refreshedAt' } as const, 0)
+const running = atom({ plugin: 'knorky-mod', key: 'running' } as const, [] as Running[])
+const server = atom({ plugin: 'knorky-mod', key: 'server' } as const, null as string | null)
+const startedTasks = atom({ plugin: 'knorky-mod', key: 'startedTasks' } as const, [] as string[])
+const unread = atom({ plugin: 'knorky-mod', key: 'unread' } as const, false)
 const sessionTask = atom(
-  { plugin: 'knorky', key: 'sessionTask' } as const,
+  { plugin: 'knorky-mod', key: 'sessionTask' } as const,
   null as SessionTask | null,
 )
 
@@ -93,7 +93,7 @@ async function initSessions($: Api) {
   const home = (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE'))
   const base = config ?? (home ? `${home}/.claude` : null)
   if (!base) return
-  folder = `${base.replace(/\\/g, '/')}/plugin-sessions/knorky`
+  folder = `${base.replace(/\\/g, '/')}/plugin-sessions/knorky-mod`
   mine = `${await $.session.id()}.json`
 }
 
@@ -291,7 +291,7 @@ async function withServer($: Api, run: () => Promise<string>) {
   try {
     if (!(await ensureServer($))) {
       return {
-        text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky:knorky and sign in.',
+        text: 'No time-tracking server is connected. Run /mcp, choose plugin:knorky-mod:knorky and sign in.',
       }
     }
     return { text: await run() }
@@ -803,7 +803,7 @@ export const register: Register = (on) => {
 
   // The band's buttons act here, in a hook: from the button's own handler
   // Claude Code refuses the plugin's calls.
-  on('ui.press', { plugin: 'knorky' }, async ($, e) => {
+  on('ui.press', { plugin: 'knorky-mod' }, async ($, e) => {
     const said = await pressBand($, e.element).catch((err: Error) => err.message)
     if (said) $.ui.toast(said)
     return { element: e.element }
@@ -833,7 +833,7 @@ export const register: Register = (on) => {
   // work is the plugin's to report: Claude's own call of it is refused.
   on('tool.call', async ($, e, next) => {
     // the plugin's own report comes through here too, from endTurn
-    if (PLUGIN_ONLY.test(e.tool) && next.origin.plugin !== 'knorky') {
+    if (PLUGIN_ONLY.test(e.tool) && next.origin.plugin !== 'knorky-mod') {
       return { deny: PLUGIN_ONLY_SAYS }
     }
     const name = await read($, server)
@@ -856,12 +856,12 @@ export const register: Register = (on) => {
     return ran
   }).catch(($, e, next) =>
     // a failure refuses Claude the agent-work tool still; any other call goes on
-    next.called || !PLUGIN_ONLY.test(e.tool) || next.origin.plugin === 'knorky'
+    next.called || !PLUGIN_ONLY.test(e.tool) || next.origin.plugin === 'knorky-mod'
       ? next(e)
       : { deny: PLUGIN_ONLY_SAYS },
   )
 
-  on('tool.call', { tool: 'mcp__knorky__remember_project' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__knorky-mod__remember_project' }, async ($, e) => {
     const { project_id, project_name } = e as unknown as {
       project_id: string
       project_name: string

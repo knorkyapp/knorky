@@ -6,7 +6,7 @@ const SERVER = 'claude_ai_Time'
 const TOOLS = ['start_timer', 'stop_timer', 'get_running_timers', 'create_task', 'list_tasks']
 
 const BAND = {
-  plugin: 'knorky',
+  plugin: 'knorky-mod',
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
@@ -79,7 +79,7 @@ type StepUsage = {
   cache_creation_input_tokens: number
 }
 
-const CLAIMS = '/home/me/.claude/plugin-sessions/knorky'
+const CLAIMS = '/home/me/.claude/plugin-sessions/knorky-mod'
 const NOW = Date.parse('2026-10-30T12:00:05Z')
 
 /** The engine and the time-tracking server, as far as the mod reaches them. */
@@ -150,7 +150,7 @@ function engine(on: On, timers: Timer[], calls: Call[], world: World = {}) {
   })
   on('store.keys', () => ({ value: [...store.keys()] }))
   on('command.register', (_, e) => ({ value: { command: e.name } }))
-  on('tool.register', (_, e) => ({ value: { tool: `mcp__knorky__${e.name}` } }))
+  on('tool.register', (_, e) => ({ value: { tool: `mcp__knorky-mod__${e.name}` } }))
   on('mcp.call', (_, e) => {
     calls.push({ tool: e.tool, args: e.args })
     if (world.failOnce?.delete(e.tool)) {
@@ -729,7 +729,7 @@ test('without the server, /track says how to connect it', async ($, on) => {
 
   await $.session.start({ cwd: '/repo', surface: 'terminal', isInteractive: true })
   const ran = await $.command.run({ command: 'track', args: '' })
-  expect(ran.text).toContain('Run /mcp, choose plugin:knorky:knorky and sign in')
+  expect(ran.text).toContain('Run /mcp, choose plugin:knorky-mod:knorky and sign in')
 })
 
 test('a server that connects after the session started still gets the band', async ($, on) => {

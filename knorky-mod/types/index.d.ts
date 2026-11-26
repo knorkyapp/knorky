@@ -22,7 +22,7 @@ export type DayTotal = { day: string; seconds: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    knorky: {
+    'knorky-mod': {
       server: string | null
       running: Running[]
       onBreak: boolean

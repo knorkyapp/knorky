@@ -80,18 +80,18 @@ timer for the task it works on, shows it above the prompt, and stops it
 when you stop. Type this at the prompt of Claude Code:
 
 ```
-/plugin install knorky --marketplace knorkyapp/knorky
+/plugin install knorky-mod --marketplace knorkyapp/knorky
 ```
 
 It needs a Knorky account with the Plus plan. How to sign in, the
 commands, and what to do when something is wrong:
 [the documentation](https://knorky.com/en/docs/claude-code-plugin/).
 
-Claude's plugin directory lists a lighter version,
-[claude-plugin-basic/](claude-plugin-basic/): the same sign-in, tracking
-rules and commands, as plain text with no code on your computer. It has no
-timer line above the prompt, and it cannot stop the timers when a session
-ends. Install one of the two, not both.
+A lighter version, `knorky`, is in [claude-plugin/](claude-plugin/) and
+submitted to Claude's plugin directory: the same sign-in, tracking rules and
+commands, as plain text with no code on your computer. It has no timer line
+above the prompt, and it cannot stop the timers when a session ends. Install
+one of the two, not both.
 
 ## ChatGPT and Codex
 
@@ -115,7 +115,7 @@ in this repository. You can also send feedback from inside the app.
 
 Knorky is open source under the
 [AGPL-3.0](https://www.gnu.org/licenses/agpl-3.0.html). The Claude Code
-plugin's source is in [claude-plugin/](claude-plugin/), the directory's
-lighter version in [claude-plugin-basic/](claude-plugin-basic/). The app's source
+plugin's source is in [knorky-mod/](knorky-mod/), the directory's
+lighter version in [claude-plugin/](claude-plugin/). The app's source
 code is not public yet, but it is **available on request**: open an issue
 here and ask, and you will be invited to the source repository.

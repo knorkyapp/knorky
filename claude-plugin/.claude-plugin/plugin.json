@@ -1,10 +1,12 @@
 {
   "name": "knorky",
-  "version": "0.5.0",
-  "description": "Tracks your Claude Code work in Knorky: a timer above the prompt with play and pause, /track, timers Claude starts for the work it does, per repository, and to-dos with /todo",
+  "displayName": "Knorky",
+  "version": "1.0.0",
+  "description": "Track your Claude Code work in the Knorky time tracker: Claude finds or creates the task and starts its timer, /track to see or change what runs, and to-dos with /todo",
   "author": {
     "name": "Knorky"
   },
+  "icon": "./.claude-plugin/icon.png",
   "homepage": "https://knorky.com",
   "documentationUrl": "https://knorky.com/en/docs/claude-code-plugin/",
   "repository": "https://github.com/knorkyapp/knorky",
@@ -12,5 +14,5 @@
   "privacyPolicyUrl": "https://knorky.com/privacy/",
   "termsOfServiceUrl": "https://knorky.com/terms/",
   "supportUrl": "https://knorky.com/en/support/?topic=plugin",
-  "keywords": ["time tracking", "timer", "mcp"]
+  "keywords": ["time tracking", "timer", "productivity"]
 }
