@@ -32,8 +32,14 @@ own marketplace. Install one of the two, not both.
 
 ## Install
 
-At the prompt of Claude Code, run `/plugin`, open **Discover**, search for
-**Knorky** and install it. In the Claude desktop app: click **+** next to the
+At the prompt of Claude Code:
+
+```
+/plugin install knorky --marketplace knorkyapp/knorky
+```
+
+Or, once Claude's plugin directory lists it: run `/plugin`, open
+**Discover**, search for **Knorky** and install it. In the Claude desktop app: click **+** next to the
 prompt box, then **Plugins**, and add Knorky. Start a new session afterwards:
 a plugin loads when a session starts.
 

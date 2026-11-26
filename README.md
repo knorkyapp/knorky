@@ -90,8 +90,14 @@ commands, and what to do when something is wrong:
 A lighter version, `knorky`, is in [claude-plugin/](claude-plugin/) and
 submitted to Claude's plugin directory: the same sign-in, tracking rules and
 commands, as plain text with no code on your computer. It has no timer line
-above the prompt, and it cannot stop the timers when a session ends. Install
-one of the two, not both.
+above the prompt, and it cannot stop the timers when a session ends. It is in
+the same marketplace too:
+
+```
+/plugin install knorky --marketplace knorkyapp/knorky
+```
+
+Install one of the two, not both.
 
 ## ChatGPT and Codex
 
