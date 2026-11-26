@@ -19,8 +19,7 @@ Knorky's login server (Logto) has no dynamic client registration, so ChatGPT
 uses a client registered for it: a **Traditional web** application named
 `ChatGPT`, with the redirect URI
 `https://chatgpt.com/connector_platform_oauth_redirect` and **Always issue
-Refresh Token** switched on. Its App ID replaces `LOGTO_CHATGPT_APP_ID` in
-`mcp.json`. Its App secret goes only into the portal's **OAuth Client
+Refresh Token** switched on. Its App ID is the `clientId` in `mcp.json`. Its App secret goes only into the portal's **OAuth Client
 Secret** field, never into this folder.
 
 ## Submit

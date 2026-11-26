@@ -10,7 +10,7 @@
             "type": "oauth",
             "client": {
               "mode": "provided",
-              "clientId": "LOGTO_CHATGPT_APP_ID",
+              "clientId": "ynhhcp5jy5rkhlhbhi0i6",
               "tokenEndpointAuthMethod": "client_secret_basic"
             },
             "defaultScopes": ["openid", "offline_access", "email"]
